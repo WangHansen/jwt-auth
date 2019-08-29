@@ -1,6 +1,6 @@
 import * as crypto from "crypto";
 import { Secret } from "jsonwebtoken";
-import { JWTKeyPair } from "./core";
+import { JWTKeyPair } from "./server";
 
 export function generateRandomPassphrase(): string {
   return Math.random()

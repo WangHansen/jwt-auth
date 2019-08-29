@@ -1,9 +1,11 @@
-import { MicroserviceAuthServer, TokenType } from "./core";
-import { MicroserviceAuthClient } from "./client";
+import { MicroserviceAuthServer, TokenType } from "./src/server";
+import { MicroserviceAuthClient } from "./src/client";
 import * as jwt from "jsonwebtoken";
-import * as utils from "./utils";
+import * as utils from "./src/utils";
 
 const { publicCert, privateCert } = utils.generateCertPair();
+console.log(publicCert);
+console.log(privateCert);
 console.log(utils.verifyPubPrivCertPair(privateCert, publicCert));
 
 // const server = new MicroserviceAuthServer();

@@ -5,8 +5,8 @@
     "declaration": true,
     "outDir": "./lib",
     "strict": true,
-    "types": ["node", "jsonwebtoken", "moment"]
+    "types": ["node", "jsonwebtoken", "moment", "jest"]
   },
   "include": ["src"],
-  "exclude": ["node_modules", "**/__tests__/*"]
+  "exclude": ["node_modules", "lib", "tests"]
 }

@@ -3,10 +3,10 @@ import { MicroserviceAuthClient } from "./src/client";
 import * as jwt from "jsonwebtoken";
 import * as utils from "./src/utils";
 
-const { publicCert, privateCert } = utils.generateCertPair();
+const { publicCert, privateCert } = utils.generateKeyPair();
 console.log(publicCert);
 console.log(privateCert);
-console.log(utils.verifyPubPrivCertPair(privateCert, publicCert));
+console.log(utils.verifyPubPrivKeyPair(privateCert, publicCert));
 
 // const server = new MicroserviceAuthServer();
 // const client = new MicroserviceAuthClient();

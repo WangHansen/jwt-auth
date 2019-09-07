@@ -12,21 +12,21 @@ export function generateRandomKeyId(): string {
   return (Math.floor(Math.random() * 99) + 1).toString();
 }
 
-export function verifyPubPrivCertPair(
-  privateCert: Secret,
-  publicCert: string
+export function verifyPubPrivKeyPair(
+  privateKey: Secret,
+  publicKey: string
 ): boolean {
   const data = "test data to be encrypted";
   const signer = crypto.createSign("sha256");
   signer.update(data);
-  const sign = signer.sign(privateCert, "hex");
+  const sign = signer.sign(privateKey, "hex");
   const verifier = crypto.createVerify("sha256");
   verifier.update(data);
-  return verifier.verify(publicCert, sign, "hex");
+  return verifier.verify(publicKey, sign, "hex");
 }
 
-export function generateCertPair(): JWTKeyPair {
-  const passphrase = generateRandomPassphrase();
+export function generateKeyPair(): JWTKeyPair {
+  const passphrase = this.generateRandomPassphrase();
   const { publicKey, privateKey } = crypto.generateKeyPairSync("rsa", {
     modulusLength: 4096,
     publicKeyEncoding: {
@@ -41,10 +41,10 @@ export function generateCertPair(): JWTKeyPair {
     }
   });
   return {
-    privateCert: {
+    privateKey: {
       key: privateKey,
       passphrase
     },
-    publicCert: publicKey
+    publicKey: publicKey
   };
 }

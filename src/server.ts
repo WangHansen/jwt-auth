@@ -17,14 +17,14 @@ export enum TokenType {
 }
 
 interface JWTKeyPairOptional {
-  publicCert?: string;
-  privateCert?: Secret;
+  publicKey?: string;
+  privateKey?: Secret;
   kid: string;
 }
 
 export interface JWTKeyPair {
-  readonly publicCert: string;
-  readonly privateCert: Secret;
+  readonly publicKey: string;
+  readonly privateKey: Secret;
 }
 
 export interface JWTPayload {
@@ -41,7 +41,7 @@ interface TokenComOptions {
 
 export interface JWTOptions {
   algorithm?: string; // algorithm, default 'RS256'
-  certNum?: number; // number of certs kept in rotation
+  keyAmount?: number; // number of keys kept in rotation
   accessTokenAge?: string; // access token expire time in zeit/ms, default '10m'
   refreshTokenAge?: string; // refresh token expire time in zeit/ms, default '7d'
   useridKey?: string; // the key to look for from payload to identify user, default "email"
@@ -49,20 +49,20 @@ export interface JWTOptions {
 
 interface IJWTOptions {
   algorithm: string;
-  certNum: number;
+  keyAmount: number;
   accessTokenAge: string;
   refreshTokenAge?: string;
   useridKey: string;
 }
 
 export class MicroserviceAuthServer {
-  private refreshCerts: JWTKeyPair;
-  private privateCerts: Map<string, Secret>;
-  private publicCerts: Map<string, string>;
+  private refreshKeys: JWTKeyPair;
+  private privateKeys: Map<string, Secret>;
+  private publicKeys: Map<string, string>;
   private clients?: Array<MicroserviceAuthClient> = [];
   private blacklist: Map<string, Date>; // userid: email to timestamp
   private options: IJWTOptions & TokenComOptions = {
-    certNum: 3,
+    keyAmount: 3,
     algorithm: "RS256",
     accessTokenAge: "10m",
     refreshTokenAge: "7d",
@@ -71,76 +71,76 @@ export class MicroserviceAuthServer {
 
   constructor(
     options?: JWTOptions & TokenComOptions,
-    privateCerts?: Map<string, Secret>,
-    publicCerts?: Map<string, string>,
+    privateKeys?: Map<string, Secret>,
+    publicKeys?: Map<string, string>,
     blacklist = new Map<string, Date>()
   ) {
     options = options || {};
     // update options
     this.options = Object.assign(this.options, options);
-    if (this.options.certNum < 3) {
-      throw new Error("Minimum number of certs in list must be 3");
+    if (this.options.keyAmount < 3) {
+      throw new Error("Minimum number of keys in list must be 3");
     }
 
-    // generate refresh certs
-    this.refreshCerts = utils.generateCertPair();
-    // generate access certs
-    const { publicCert, privateCert } = utils.generateCertPair();
-    this.publicCerts = new Map([["1", publicCert]]);
-    this.privateCerts = new Map([["1", privateCert]]);
-    // if certs passed in are valid, replace the generated cert
+    // generate refresh keys
+    this.refreshKeys = utils.generateKeyPair();
+    // generate access keys
+    const { publicKey, privateKey } = utils.generateKeyPair();
+    this.publicKeys = new Map([["1", publicKey]]);
+    this.privateKeys = new Map([["1", privateKey]]);
+    // if keys passed in are valid, replace the generated key
     if (
-      privateCerts &&
-      publicCerts &&
-      this.validateCerts(privateCerts, publicCerts)
+      privateKeys &&
+      publicKeys &&
+      this.validateKeys(privateKeys, publicKeys)
     ) {
-      this.privateCerts = privateCerts!;
-      this.publicCerts = publicCerts!;
+      this.privateKeys = privateKeys!;
+      this.publicKeys = publicKeys!;
     }
     // initialize blacklist
     this.blacklist = blacklist;
   }
 
-  private validateCerts(
-    privCerts?: Map<string, Secret>,
-    pubCerts?: Map<string, string>
+  private validateKeys(
+    privKeys?: Map<string, Secret>,
+    pubKeys?: Map<string, string>
   ): boolean {
-    if (!privCerts && !pubCerts) {
+    if (!privKeys && !pubKeys) {
       return false;
     }
-    if (!privCerts || !pubCerts) {
-      throw new Error("Private or public certs don't exist");
+    if (!privKeys || !pubKeys) {
+      throw new Error("Private or public keys don't exist");
     }
-    if (privCerts.size !== pubCerts.size) {
-      throw new Error("Number of private/pub certs don't match ");
+    if (privKeys.size !== pubKeys.size) {
+      throw new Error("Number of private/pub keys don't match ");
     }
-    for (let kid of privCerts.keys()) {
-      if (!pubCerts.get(kid)) {
+    for (let kid of privKeys.keys()) {
+      if (!pubKeys.get(kid)) {
         throw new Error(
-          `No corresponding public cert for private cert with kid ${kid}`
+          `No corresponding public key for private key with kid ${kid}`
         );
       }
     }
-    return pubCerts.size > 0;
+    return pubKeys.size > 0;
   }
 
   /**
-   * getCert will return private/public key pair, either the
+   * getKey will return private/public key pair, either the
    * latest key pair, or the key pair based on kid, to be
    * used either in sign or verify
    *
    * @param  {string} keyid? kid value
    * @returns IJWTKeyPair
    */
-  private getCerts(keyid?: string): JWTKeyPairOptional {
-    const temp = [...this.publicCerts.keys()];
-    const kid = keyid || temp[this.publicCerts.size - 1];
-    const privateCert = this.privateCerts.get(kid);
-    const publicCert = this.publicCerts.get(kid);
+  private getKeys(keyid?: string): JWTKeyPairOptional {
+    const temp = [...this.publicKeys.keys()];
+    const kid = keyid || temp[this.publicKeys.size - 1];
+    const privateKey = this.privateKeys.get(kid);
+    const publicKey = this.publicKeys.get(kid);
     return {
       kid,
-      privateCert,
-      publicCert
+      privateKey,
+      publicKey
     };
   }
 
@@ -172,57 +172,57 @@ export class MicroserviceAuthServer {
         useridKey: this.options.useridKey
       })
     );
-    client._updateCerts(this.publicCerts);
+    client._updateKeys(this.publicKeys);
     client._updateBlacklist(this.blacklist);
   }
 
   /**
-   * setRefreshCerts set the private and public cert used to sign
+   * setRefreshKeys set the private and public key used to sign
    * and verify refresh token. It is strongly not advised to pass
-   * the refresh certs in unless you are rotating it. By default
-   * refresh certs don't get rotated, they are generated when the
+   * the refresh keys in unless you are rotating it. By default
+   * refresh keys don't get rotated, they are generated when the
    * server starts and never accessed outside, so they are relatively
    * safe. Another reason is that refresh token are not refreshed,
    * they are only verified. When user's refresh token expired, they
    * are asked to login with credentials again.
    *
-   * @param  {Secret} privateCert
-   * @param  {string} publicCert
+   * @param  {Secret} privateKey
+   * @param  {string} publicKey
    */
-  setRefreshCerts(privateCert: Secret, publicCert: string) {
-    if (!utils.verifyPubPrivCertPair(privateCert, publicCert)) {
-      throw new Error("Public/private certs don't match");
+  setRefreshKeys(privateKey: Secret, publicKey: string) {
+    if (!utils.verifyPubPrivKeyPair(privateKey, publicKey)) {
+      throw new Error("Public/private keys don't match");
     }
-    this.refreshCerts = { publicCert, privateCert };
+    this.refreshKeys = { publicKey, privateKey };
   }
 
   /**
-   * rotateCerts generates a new pair of public/private certs and
-   * insert them in the list of certs. When the certs in the list
-   * exceeds the certNum specified, the oldest certs get deleted
+   * rotateKeys generates a new pair of public/private keys and
+   * insert them in the list of keys. When the keys in the list
+   * exceeds the keyAmount specified, the oldest keys get deleted
    * @returns {Map<string, string>} - the public keys
    */
-  rotateCerts(): Map<string, string> {
+  rotateKeys(): Map<string, string> {
     let keyid: string;
     do {
       keyid = utils.generateRandomKeyId();
-    } while (this.publicCerts.has(keyid));
+    } while (this.publicKeys.has(keyid));
 
-    const { publicCert, privateCert } = utils.generateCertPair();
+    const { publicKey, privateKey } = utils.generateKeyPair();
 
-    this.publicCerts.set(keyid, publicCert);
-    this.privateCerts.set(keyid, privateCert);
+    this.publicKeys.set(keyid, publicKey);
+    this.privateKeys.set(keyid, privateKey);
 
     // delete the first key
-    if (this.publicCerts.size > this.options.certNum) {
-      const temp = [...this.publicCerts.keys()];
+    if (this.publicKeys.size > this.options.keyAmount) {
+      const temp = [...this.publicKeys.keys()];
       const key = temp[0];
-      this.publicCerts.delete(key);
-      this.privateCerts.delete(key);
+      this.publicKeys.delete(key);
+      this.privateKeys.delete(key);
     }
 
-    this.syncCerts();
-    return this.publicCerts;
+    this.syncKeys();
+    return this.publicKeys;
   }
 
   generateToken(
@@ -238,15 +238,15 @@ export class MicroserviceAuthServer {
       delete opts.expiresIn;
     }
     opts = Object.assign(this.tokenOpts(type), opts);
-    let { privateCert, kid } = this.getCerts(opts.keyid);
+    let { privateKey, kid } = this.getKeys(opts.keyid);
     opts.keyid = kid;
     if (type === TokenType.Refresh) {
-      privateCert = this.refreshCerts.privateCert;
+      privateKey = this.refreshKeys.privateKey;
     }
-    if (!privateCert) {
-      throw new Error("Cannot sign without a cert");
+    if (!privateKey) {
+      throw new Error("Cannot sign without a key");
     }
-    return sign(payload, privateCert, opts);
+    return sign(payload, privateKey, opts);
   }
 
   verifyToken(type: TokenType, token: string, opts?: VerifyOptions) {
@@ -255,16 +255,16 @@ export class MicroserviceAuthServer {
     delete opts.algorithms;
     opts = Object.assign(this.tokenOpts(type, false), opts);
     const { header } = decode(token, { complete: true }) as any;
-    let { publicCert } = this.getCerts(header.kid);
+    let { publicKey } = this.getKeys(header.kid);
     if (type === TokenType.Refresh) {
-      publicCert = this.refreshCerts.publicCert;
+      publicKey = this.refreshKeys.publicKey;
     }
-    if (!publicCert) {
-      const err = new Error("Cert doesn't exists or expired");
-      err.name = "CertNotExistsError";
+    if (!publicKey) {
+      const err = new Error("Key doesn't exists or expired");
+      err.name = "KeyNotExistsError";
       throw err;
     }
-    return verify(token, publicCert, opts);
+    return verify(token, publicKey, opts);
   }
 
   revoke(
@@ -296,14 +296,14 @@ export class MicroserviceAuthServer {
     }
   }
 
-  private syncCerts() {
+  private syncKeys() {
     if (this.clients && this.clients.length > 0) {
       this.clients.forEach(c => c._updateBlacklist(this.blacklist));
     }
   }
 
-  get certs() {
-    return this.publicCerts;
+  get keys() {
+    return this.publicKeys;
   }
 
   get revokedList() {

@@ -298,7 +298,7 @@ export class MicroserviceAuthServer {
 
   private syncKeys() {
     if (this.clients && this.clients.length > 0) {
-      this.clients.forEach(c => c._updateBlacklist(this.blacklist));
+      this.clients.forEach(c => c._updateKeys(this.publicKeys));
     }
   }
 

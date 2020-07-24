@@ -9,11 +9,9 @@ import {
 import got from "got";
 import { Request, Response, NextFunction } from "express";
 import * as crypto from "crypto";
-import FileStorage, { Storage } from "./storage";
+import { Storage } from "./storage";
 import { RevokedError, SyncError } from "./error";
 import { CronJob } from "cron";
-
-export { FileStorage };
 
 export interface Options {
   algorithm?: keyType; // default "EC"
@@ -45,7 +43,7 @@ export interface RevocationListItem {
 const KEYGENOPT: BasicParameters = { use: "sig" };
 
 export default class JWTAuth<T extends RevocationListItem> {
-  private storage: Storage<T>;
+  private storage: Storage<T> | null = null;
   private keystore: JWKS.KeyStore;
   private keyids: string[] = [];
   private clients: JWTAuthClientData = {};
@@ -60,13 +58,23 @@ export default class JWTAuth<T extends RevocationListItem> {
     tokenAge: "10m",
   };
   // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
-  revokeCallback = ({ payload: { jti, exp } }) => ({ jti, exp });
+  revokeCallback = ({ payload: { jti, exp } }): T => ({ jti, exp } as T);
 
-  constructor(storage: Storage<T>, config?: Options) {
+  constructor(config?: Options) {
     this.config = this.configCheck(config);
-    this.storage = storage;
+    const { interval } = this.config;
     this.keystore = new JWKS.KeyStore();
-    this.cronJob = null;
+    this.fillKeystore();
+    this.cronJob = new CronJob(
+      interval,
+      function () {
+        this.rotate();
+      },
+      null,
+      true,
+      undefined,
+      this
+    );
   }
 
   /**
@@ -90,15 +98,17 @@ export default class JWTAuth<T extends RevocationListItem> {
   }
 
   /**
-   * Initalized the server library, read the key files from storage
-   * or generate keys if not enough key is found. Also start the cron
-   * job to rotate keys
+   * Read the key files from storage to replace the generated keys
+   * currently in keystore and generate keys if not enough key is
+   * found. Also restart the cron job to rotate keys
    */
-  public async init(): Promise<void> {
+  public async setStorage(storage: Storage<T>): Promise<void> {
     const { interval } = this.config;
+    this.storage = storage;
     // load keys, clients and revoclist if they exists
     await this.loadFromStorage();
-    await this.fillKeystore();
+    this.fillKeystore();
+    await this.saveKeys();
     this.cronJob = new CronJob(
       interval,
       function () {
@@ -112,13 +122,12 @@ export default class JWTAuth<T extends RevocationListItem> {
   }
 
   // if there is not enough keys, generate more, also update keyid list
-  private async fillKeystore(): Promise<void> {
+  private fillKeystore(): void {
     const { amount, algorithm, crvOrSize } = this.config;
     while (this.keystore.size < amount) {
       this.keystore.generateSync(algorithm, crvOrSize, KEYGENOPT);
     }
     this.updateKeyids();
-    await this.saveKeys();
   }
 
   /**
@@ -136,7 +145,7 @@ export default class JWTAuth<T extends RevocationListItem> {
     data: JWTAuthData<T>,
     cb: (name: string, err: Error) => void
   ): Promise<void> {
-    const allPromise: Promise<any>[] = [];
+    const allPromise: Promise<unknown>[] = [];
     Object.entries(this.clients).forEach(([name, url]) => {
       allPromise.push(
         got.post(url, { json: data }).catch((err) => cb(name, err))
@@ -157,6 +166,7 @@ export default class JWTAuth<T extends RevocationListItem> {
   }
 
   private async loadFromStorage(): Promise<void> {
+    if (!this.storage) return;
     await Promise.all([
       this.loadKeys(),
       this.loadClients(),
@@ -166,6 +176,9 @@ export default class JWTAuth<T extends RevocationListItem> {
 
   private async loadKeys(): Promise<void> {
     let JWKSet: JSONWebKeySet;
+    if (!this.storage) {
+      throw new Error("No persistent storage provided");
+    }
     try {
       JWKSet = await this.storage.loadKeys();
     } catch (error) {
@@ -177,6 +190,9 @@ export default class JWTAuth<T extends RevocationListItem> {
   }
 
   private async loadClients(): Promise<void> {
+    if (!this.storage) {
+      throw new Error("No persistent storage provided");
+    }
     try {
       this.clients = (await this.storage.loadClients()) || {};
     } catch (error) {
@@ -187,6 +203,9 @@ export default class JWTAuth<T extends RevocationListItem> {
   }
 
   private async loadRevocList(): Promise<void> {
+    if (!this.storage) {
+      throw new Error("No persistent storage provided");
+    }
     try {
       this.revocationList = (await this.storage.loadRevocationList()) || [];
     } catch (error) {
@@ -197,6 +216,9 @@ export default class JWTAuth<T extends RevocationListItem> {
   }
 
   private async saveKeys(): Promise<void> {
+    if (!this.storage) {
+      throw new Error("No persistent storage provided");
+    }
     try {
       await this.storage.saveKeys(this.JWKS(true));
     } catch (error) {
@@ -205,6 +227,9 @@ export default class JWTAuth<T extends RevocationListItem> {
   }
 
   private async saveClients(): Promise<void> {
+    if (!this.storage) {
+      throw new Error("No persistent storage provided");
+    }
     try {
       await this.storage.saveClients(this.clients);
     } catch (error) {
@@ -213,6 +238,9 @@ export default class JWTAuth<T extends RevocationListItem> {
   }
 
   private async saveRevocList(): Promise<void> {
+    if (!this.storage) {
+      throw new Error("No persistent storage provided");
+    }
     try {
       await this.storage.saveRevocationList(this.revocationList);
     } catch (error) {
@@ -259,7 +287,9 @@ export default class JWTAuth<T extends RevocationListItem> {
       this.updateKeyids();
       amountToRemove--;
     }
-    await this.saveKeys();
+    if (this.storage) {
+      await this.saveKeys();
+    }
     await this.sync((name: string, err: Error) => {
       throw new SyncError(`Failed to sync with ${name}, ${err.message}`);
     });
@@ -271,19 +301,19 @@ export default class JWTAuth<T extends RevocationListItem> {
    * to be revoked
    * @param {string} kid - id of the key to be removed
    */
-  async revokeKey(kid: string): Promise<void> {
+  revokeKey(kid: string): void {
     const keyToRemove = this.keystore.get({ kid });
     this.keystore.remove(keyToRemove);
-    await this.fillKeystore();
+    this.fillKeystore();
   }
 
   /**
    * Revoke all keys in the keystore
    * Note: this will cause all JWTs signed to be invalid
    */
-  async reset(): Promise<void> {
+  reset(): void {
     this.keystore = new JWKS.KeyStore();
-    await this.fillKeystore();
+    this.fillKeystore();
   }
 
   /**
@@ -297,7 +327,9 @@ export default class JWTAuth<T extends RevocationListItem> {
       throw new Error("Client data not complete, missing name or url or path");
     }
     this.clients[name] = url;
-    await this.saveClients();
+    if (this.storage) {
+      await this.saveClients();
+    }
     return this.data;
   }
 
@@ -412,6 +444,8 @@ export default class JWTAuth<T extends RevocationListItem> {
   ): Promise<void> {
     const jwtObj = JWT.decode(jwt, { complete: true });
     this.revocationList.push(cb(jwtObj));
-    this.saveRevocList();
+    if (this.storage) {
+      await this.saveRevocList();
+    }
   }
 }

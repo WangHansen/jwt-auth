@@ -54,7 +54,7 @@ export default class FileStorage extends Storage<RevocationListItem> {
   /**
    * Load data from a file
    *
-   * @param {String} filepath
+   * @param {string} filepath
    * @returns {Promise<string>} data
    */
   private async loadFromFile(filepath: string) {

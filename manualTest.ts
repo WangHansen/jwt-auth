@@ -1,16 +1,29 @@
-import { MicroserviceAuthServer, TokenType } from "./src/server";
-import { MicroserviceAuthClient } from "./src/client";
-import * as jwt from "jsonwebtoken";
-import * as utils from "./src/utils";
+import MicroserviceAuthServer from "./src/server";
+// import MicroserviceAuthClient from "./src/client";
+import FileStorage from "./src/storage";
+// import * as utils from "./src/utils";
 
-const { publicCert, privateCert } = utils.generateKeyPair();
-console.log(publicCert);
-console.log(privateCert);
-console.log(utils.verifyPubPrivKeyPair(privateCert, publicCert));
-
-// const server = new MicroserviceAuthServer();
+const server = new MicroserviceAuthServer(new FileStorage());
 // const client = new MicroserviceAuthClient();
-
+server.init().then(() => {
+  // server.rotateKeys().then(() => {
+  //   console.log(server.keys());
+  // });
+  // const jwt = server.sign({ userid: "example.com" });
+  // const decoded = server.verify(jwt);
+  // console.log(jwt);
+  // console.log(decoded);
+  console.log(server.keys);
+  console.log(server.privKeys);
+  // server.revoke(jwt);
+  // console.log(server.blacklist);
+  // try {
+  //   server.verify(jwt);
+  // } catch (error) {
+  //   console.log(error);
+  // }
+  // console.log(server.);
+});
 // server.registerClient(client);
 
 // const access_token_1 = server.generateToken(TokenType.Access, {

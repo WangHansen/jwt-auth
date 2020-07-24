@@ -1,12 +1,14 @@
 {
   "compilerOptions": {
-    "target": "es2015",
+    "target": "ES6",
     "module": "commonjs",
     "noImplicitThis": false,
+    "noImplicitAny": false,
     "declaration": true,
     "outDir": "./lib",
     "strict": true,
-    "types": ["node", "jsonwebtoken", "moment", "jest"]
+    "moduleResolution": "node",
+    "types": ["node", "jest", "got", "jose", "cron", "express"],
   },
   "include": ["src"],
   "exclude": ["node_modules", "lib", "tests"]

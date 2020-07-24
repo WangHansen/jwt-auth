@@ -1,6 +1,6 @@
 {
   "name": "@hansenw/jwt-auth",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "A minimal authentication library to help developer build authentication system for microservice application!",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",

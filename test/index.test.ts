@@ -4,6 +4,7 @@ import { JWKS } from "jose";
 import { CronJob } from "cron";
 import { RevokedError } from "../src/error";
 jest.mock("../src/storage");
+jest.mock("cron");
 
 describe("JWTAuth Tests: ", () => {
   let storageMock: FileStorage;
@@ -74,7 +75,7 @@ describe("JWTAuth Tests: ", () => {
       const spyFill = jest
         .spyOn(auth, "fillKeystore")
         .mockImplementation(() => Promise.resolve());
-      await auth.setStorage(storageMock).then(() => auth.cronJob.stop());
+      await auth.setStorage(storageMock);
       expect(spyLoad).toBeCalled();
       expect(spyFill).toBeCalled();
       expect(auth.cronJob).toBeInstanceOf(CronJob);

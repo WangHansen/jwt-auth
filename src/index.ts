@@ -13,6 +13,8 @@ import { Storage } from "./storage";
 import { RevokedError, SyncError } from "./error";
 import { CronJob } from "cron";
 
+export { Storage };
+
 export interface Options {
   algorithm?: keyType; // default "EC"
   crvOrSize?: Curves | number; // key size (in bits) or named curve ('crv') for "EC"
@@ -27,8 +29,8 @@ interface ClientData {
   url: string;
 }
 
-interface JWTAuthData extends JSONWebKeySet {
-  revocList: object[];
+interface JWTAuthData<T> extends JSONWebKeySet {
+  revocList: T[];
 }
 
 export interface JWTAuthClientData {
@@ -42,12 +44,12 @@ export interface RevocationListItem {
 
 const KEYGENOPT: BasicParameters = { use: "sig" };
 
-export default class JWTAuth {
-  private storage: Storage<RevocationListItem>;
+export default class JWTAuth<T extends RevocationListItem> {
+  private storage: Storage<T>;
   private keystore: JWKS.KeyStore;
   private keyids: string[] = [];
   private clients: JWTAuthClientData = {};
-  private revocationList: RevocationListItem[] = [];
+  private revocationList: T[] = [];
   private cronJob: CronJob | null;
   private config: Required<Options> = {
     algorithm: "EC",
@@ -60,7 +62,7 @@ export default class JWTAuth {
   // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
   revokeCallback = ({ payload: { jti, exp } }) => ({ jti, exp });
 
-  constructor(storage: Storage<RevocationListItem>, config?: Options) {
+  constructor(storage: Storage<T>, config?: Options) {
     this.config = this.configCheck(config);
     this.storage = storage;
     this.keystore = new JWKS.KeyStore();
@@ -68,20 +70,17 @@ export default class JWTAuth {
   }
 
   /**
-  * validate the options passed to constructor
-  * @param  {Options} [config] - configuration
-  * @returns {Options} - merged configuration
-  */
+   * validate the options passed to constructor
+   * @param  {Options} [config] - configuration
+   * @returns {Options} - merged configuration
+   */
   private configCheck(config?: Options): Required<Options> {
     if (!config) return this.config;
     const { amount, signSkip } = config;
     if (amount && amount < 3) {
       config.amount = 3; // minimum key number is 3
     }
-    if (
-      signSkip &&
-      signSkip >= (config.amount || this.config.amount)
-    ) {
+    if (signSkip && signSkip >= (config.amount || this.config.amount)) {
       throw new Error(
         "Number of keys skipped for signing must be small than total number of keys"
       );
@@ -91,10 +90,10 @@ export default class JWTAuth {
   }
 
   /**
-  * Initalized the server library, read the key files from storage
-  * or generate keys if not enough key is found. Also start the cron
-  * job to rotate keys
-  */
+   * Initalized the server library, read the key files from storage
+   * or generate keys if not enough key is found. Also start the cron
+   * job to rotate keys
+   */
   public async init(): Promise<void> {
     const { interval } = this.config;
     // load keys, clients and revoclist if they exists
@@ -116,37 +115,31 @@ export default class JWTAuth {
   private async fillKeystore(): Promise<void> {
     const { amount, algorithm, crvOrSize } = this.config;
     while (this.keystore.size < amount) {
-      this.keystore.generateSync(
-        algorithm,
-        crvOrSize,
-        KEYGENOPT
-      );
+      this.keystore.generateSync(algorithm, crvOrSize, KEYGENOPT);
     }
     this.updateKeyids();
     await this.saveKeys();
   }
 
   /**
-  * Callback is invoked when sync with a client errors
-  * @callback syncFailedCallback
-  * @param {string} name - name of the client
-  * @param {string} error - error rejected
-  */
+   * Callback is invoked when sync with a client errors
+   * @callback syncFailedCallback
+   * @param {string} name - name of the client
+   * @param {string} error - error rejected
+   */
   /**
-  * Sync the keys with all clients
-  * @param {object} data - the data to be synced
-  * @param {syncFailedCallback} cb - called when sync failed with a client
-  */
+   * Sync the keys with all clients
+   * @param {object} data - the data to be synced
+   * @param {syncFailedCallback} cb - called when sync failed with a client
+   */
   private async syncWithClients(
-    data: object,
-    cb: (name: string, err: Error) => {}
+    data: JWTAuthData<T>,
+    cb: (name: string, err: Error) => void
   ): Promise<void> {
     const allPromise: Promise<any>[] = [];
     Object.entries(this.clients).forEach(([name, url]) => {
       allPromise.push(
-        got
-          .post(url, { json: data })
-          .catch((err) => cb(name, err))
+        got.post(url, { json: data }).catch((err) => cb(name, err))
       );
     });
     await Promise.all(allPromise);
@@ -155,8 +148,7 @@ export default class JWTAuth {
   private generateJTI(): string {
     const hash = crypto.createHash("sha256");
     const rand =
-      new Date().getTime().toString(36) +
-      Math.random().toString(36).slice(2);
+      new Date().getTime().toString(36) + Math.random().toString(36).slice(2);
     return hash.update(rand).digest("base64");
   }
 
@@ -177,9 +169,7 @@ export default class JWTAuth {
     try {
       JWKSet = await this.storage.loadKeys();
     } catch (error) {
-      throw new Error(
-        "storage.loadKeys function should not throw exception"
-      );
+      throw new Error("storage.loadKeys function should not throw exception");
     }
     if (JWKSet?.keys) {
       this.keystore = JWKS.asKeyStore(JWKSet);
@@ -198,8 +188,7 @@ export default class JWTAuth {
 
   private async loadRevocList(): Promise<void> {
     try {
-      this.revocationList =
-        (await this.storage.loadRevocationList()) || [];
+      this.revocationList = (await this.storage.loadRevocationList()) || [];
     } catch (error) {
       throw new Error(
         "storage.loadRevocationList function should not throw exception"
@@ -235,14 +224,14 @@ export default class JWTAuth {
   //       getters         //
   //-----------------------//
 
-  get data(): JWTAuthData {
+  get data(): JWTAuthData<T> {
     return {
       keys: this.JWKS().keys,
       revocList: this.revocationList,
     };
   }
 
-  get blacklist(): object[] {
+  get blacklist(): T[] {
     return this.revocationList;
   }
 
@@ -255,15 +244,11 @@ export default class JWTAuth {
   }
 
   /**
-  * Remove the oldest key and replace it with a new key
-  */
+   * Remove the oldest key and replace it with a new key
+   */
   async rotate(): Promise<void> {
     const { amount, algorithm, crvOrSize } = this.config;
-    await this.keystore.generate(
-      algorithm,
-      crvOrSize,
-      KEYGENOPT
-    );
+    await this.keystore.generate(algorithm, crvOrSize, KEYGENOPT);
     this.updateKeyids();
     let amountToRemove = this.keystore.size - amount;
     while (amountToRemove > 0) {
@@ -276,18 +261,16 @@ export default class JWTAuth {
     }
     await this.saveKeys();
     await this.sync((name: string, err: Error) => {
-      throw new SyncError(
-        `Failed to sync with ${name}, ${err.message}`
-      );
+      throw new SyncError(`Failed to sync with ${name}, ${err.message}`);
     });
   }
 
   /**
-  * Revoke one key for verifying and signing
-  * Note: this may cause all the JWT signed with this kid
-  * to be revoked
-  * @param {string} kid - id of the key to be removed
-  */
+   * Revoke one key for verifying and signing
+   * Note: this may cause all the JWT signed with this kid
+   * to be revoked
+   * @param {string} kid - id of the key to be removed
+   */
   async revokeKey(kid: string): Promise<void> {
     const keyToRemove = this.keystore.get({ kid });
     this.keystore.remove(keyToRemove);
@@ -295,25 +278,23 @@ export default class JWTAuth {
   }
 
   /**
-  * Revoke all keys in the keystore
-  * Note: this will cause all JWTs signed to be invalid
-  */
+   * Revoke all keys in the keystore
+   * Note: this will cause all JWTs signed to be invalid
+   */
   async reset(): Promise<void> {
     this.keystore = new JWKS.KeyStore();
     await this.fillKeystore();
   }
 
   /**
-  * Register a client
-  * @param {ClientData} data - data passed from client
-  * @throws throws an error if one of name, url and path is missing
-  */
-  async registerClient(data: ClientData): Promise<JWTAuthData> {
+   * Register a client
+   * @param {ClientData} data - data passed from client
+   * @throws throws an error if one of name, url and path is missing
+   */
+  async registerClient(data: ClientData): Promise<JWTAuthData<T>> {
     const { name, url } = data;
     if (!name || !url) {
-      throw new Error(
-        "Client data not complete, missing name or url or path"
-      );
+      throw new Error("Client data not complete, missing name or url or path");
     }
     this.clients[name] = url;
     await this.saveClients();
@@ -321,10 +302,10 @@ export default class JWTAuth {
   }
 
   /**
-  * Function used for connect like server such as express
-  * @example
-  * app.post('/client/register', server.register)
-  */
+   * Function used for connect like server such as express
+   * @example
+   * app.post('/client/register', server.register)
+   */
   register = async (
     req: Request,
     res: Response,
@@ -339,26 +320,23 @@ export default class JWTAuth {
   };
 
   /**
-  * Sync data with all the registered clients
-  * @param {Function} cb - callback to handle error
-  */
-  async sync(
-    cb: (name: string, err: Error) => {}
-  ): Promise<void> {
+   * Sync data with all the registered clients
+   * @param {Function} cb - callback to handle error
+   */
+  async sync(cb: (name: string, err: Error) => void): Promise<void> {
     await this.syncWithClients(this.data, cb);
   }
 
   /**
-  * Create a JWT token with custom payload and options
-  * @param {object} payload - payload of jwt
-  * @param {JWK.SignOptions} [options]
-  * @returns {string} token
-  */
-  sign(payload: object, options?: JWT.SignOptions): string {
+   * Create a JWT token with custom payload and options
+   * @param {object} payload - payload of jwt
+   * @param {JWK.SignOptions} [options]
+   * @returns {string} token
+   */
+  sign(payload: Record<string, unknown>, options?: JWT.SignOptions): string {
     options = options || {};
     const keyIndex = Math.floor(
-      Math.random() *
-        (this.keystore.size - this.config.signSkip) +
+      Math.random() * (this.keystore.size - this.config.signSkip) +
         this.config.signSkip
     );
     const key = this.keystore.get({
@@ -374,19 +352,18 @@ export default class JWTAuth {
   }
 
   /**
-  * Verify a JWT token with current keystore
-  * @param {string} jwt
-  * @param {JWT.VerifyOptions} options
-  */
-  verify(jwt: string, options?: JWT.SignOptions): object {
+   * Verify a JWT token with current keystore
+   * @param {string} jwt
+   * @param {JWT.VerifyOptions} options
+   */
+  verify(jwt: string, options?: JWT.SignOptions): Record<string, unknown> {
     options = options || {};
     let revoked = false;
-    const payload = JWT.verify(
-      jwt,
-      this.keystore,
-      options
-    ) as RevocationListItem;
-    const newRevokedList: RevocationListItem[] = [];
+    const payload = JWT.verify(jwt, this.keystore, options) as Record<
+      string,
+      unknown
+    >;
+    const newRevokedList: T[] = [];
     for (const item of this.revocationList) {
       const { jti, exp } = item as RevocationListItem;
       if (new Date() > new Date(exp * 1000)) {
@@ -405,32 +382,33 @@ export default class JWTAuth {
   }
 
   /**
-  * Callback is used to trasform payload into a format which
-  * is saved in the revocation list, default format is:
-  * { id: <some jti>, exp: <date> }
-  * @description
-  * By default, jti is used to identify which token in revoked.
-  * Default callback returns an object containing both expire
-  * time and jti, which then is saved into the revocation list.
-  * So the list looks like: [{ id: <some jti>, exp: <date> }]
-  * The exp is used by to remove it from the list once the time
-  * has passed its exp time.
-  *
-  * @callback revokeCallback
-  * @param {JWT.completeResult} jwt - jwt object containing header, payload, signature
-  * @returns {any} object or anything that will be pushed into the list
-  */
+   * Callback is used to trasform payload into a format which
+   * is saved in the revocation list, default format is:
+   * { id: <some jti>, exp: <date> }
+   * @description
+   * By default, jti is used to identify which token in revoked.
+   * Default callback returns an object containing both expire
+   * time and jti, which then is saved into the revocation list.
+   * So the list looks like: [{ id: <some jti>, exp: <date> }]
+   * The exp is used by to remove it from the list once the time
+   * has passed its exp time.
+   *
+   * @callback revokeCallback
+   * @param {JWT.completeResult} jwt - jwt object containing header, payload, signature
+   * @returns {any} object or anything that will be pushed into the list
+   */
   /**
-  * Revoke access to a specific token
-  * @param {string} jwt
-  * @param {revokeCallback} callback
-  */
+   * Revoke access to a specific token
+   * @param {string} jwt
+   * @param {revokeCallback} callback
+   */
   async revoke(
     jwt: string,
-    cb = ({ payload }) => ({
-      jti: payload.jti,
-      exp: payload.exp,
-    })
+    cb = ({ payload }) =>
+      ({
+        jti: payload.jti,
+        exp: payload.exp,
+      } as T)
   ): Promise<void> {
     const jwtObj = JWT.decode(jwt, { complete: true });
     this.revocationList.push(cb(jwtObj));

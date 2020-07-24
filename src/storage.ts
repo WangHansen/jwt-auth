@@ -1,6 +1,6 @@
 import * as fs from "fs";
 import { JSONWebKeySet } from "jose";
-import {JWTAuthClientData } from ".";
+import { JWTAuthClientData } from ".";
 
 export interface RevocationListItem {
   jti: string;

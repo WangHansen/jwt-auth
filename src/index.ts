@@ -9,11 +9,11 @@ import {
 import got from "got";
 import { Request, Response, NextFunction } from "express";
 import * as crypto from "crypto";
-import { Storage } from "./storage";
+import FileStorage, { Storage } from "./storage";
 import { RevokedError, SyncError } from "./error";
 import { CronJob } from "cron";
 
-export { Storage };
+export { FileStorage };
 
 export interface Options {
   algorithm?: keyType; // default "EC"

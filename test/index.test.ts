@@ -2,7 +2,7 @@ import JWTAuth, { JwtAuthOptions } from "../src";
 import FileStorage from "../src/storage";
 import { JWKS } from "jose";
 import { CronJob } from "cron";
-import { RevokedError } from "../src/error";
+import { JWTRevoked } from "../src/error";
 jest.mock("../src/storage");
 jest.mock("cron");
 
@@ -309,7 +309,19 @@ describe("JWTAuth Tests: ", () => {
       expect(newKeyids).not.toContain(keyids);
     });
 
-    test("revokeKey should remove the key based on id", async () => {
+    test("revokeKey should call saveKeys if storage is present", async () => {
+      const auth: any = new JWTAuth();
+      await auth.setStorage(storageMock);
+      const spy = jest.spyOn(auth, "saveKeys").mockResolvedValueOnce({});
+      const keyids = auth.keyids;
+      const keyid = keyids[0];
+      await auth.revokeKey(keyid);
+      const newKeyids = auth.keyids;
+      expect(newKeyids).not.toContain(keyids);
+      expect(spy).toBeCalled();
+    });
+
+    test("reset should remove all old key and generate a new set", async () => {
       const auth: any = new JWTAuth();
       const keyids = auth.keyids;
       await auth.reset();
@@ -317,6 +329,19 @@ describe("JWTAuth Tests: ", () => {
       for (const id of keyids) {
         expect(newKeyids).not.toContain(id);
       }
+    });
+
+    test("reset should call saveKeys if storage is present", async () => {
+      const auth: any = new JWTAuth();
+      await auth.setStorage(storageMock);
+      const spy = jest.spyOn(auth, "saveKeys").mockResolvedValueOnce({});
+      const keyids = auth.keyids;
+      await auth.reset();
+      const newKeyids = auth.keyids;
+      for (const id of keyids) {
+        expect(newKeyids).not.toContain(id);
+      }
+      expect(spy).toBeCalled();
     });
 
     test("registerClient should return data", async () => {
@@ -366,7 +391,7 @@ describe("JWTAuth Tests: ", () => {
       expect(spy).not.toHaveBeenCalled();
       expect(auth.revocationList).toHaveLength(1);
       expect(auth.revocationList[0]).toHaveProperty("jti", "123");
-      expect(() => auth.verify(jwt)).toThrow(RevokedError);
+      expect(() => auth.verify(jwt)).toThrow(JWTRevoked);
     });
 
     test("token revoked should be saved if storage is set", async () => {
@@ -378,7 +403,17 @@ describe("JWTAuth Tests: ", () => {
       expect(spy).toBeCalled();
       expect(auth.revocationList).toHaveLength(1);
       expect(auth.revocationList[0]).toHaveProperty("jti", "234");
-      expect(() => auth.verify(jwt)).toThrow(RevokedError);
+      expect(() => auth.verify(jwt)).toThrow(JWTRevoked);
+    });
+
+    test("token expired should not be verified", async () => {
+      const auth: any = new JWTAuth();
+      const jwt = auth.sign(
+        { username: "test" },
+        { jti: "234", expiresIn: "1s" }
+      );
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      auth.verify(jwt);
     });
   });
 });

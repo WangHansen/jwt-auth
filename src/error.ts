@@ -1,4 +1,4 @@
-export class RevokedError extends Error {
+export class JWTRevoked extends Error {
   code: string;
   constructor(message?: string) {
     super(message);
@@ -6,7 +6,7 @@ export class RevokedError extends Error {
       this.message = "token has been revoked";
     }
     this.name = this.constructor.name;
-    this.code = "ERR_TOKEN_REVOKED";
+    this.code = "ERR_JWT_REVOKED";
     Error.captureStackTrace(this, this.constructor);
   }
 }

@@ -10,7 +10,7 @@ import got from "got";
 import { Request, Response, NextFunction } from "express";
 import * as crypto from "crypto";
 import { Storage } from "./storage/interface";
-import { RevokedError, SyncError } from "./error";
+import { JWTRevoked, SyncError } from "./error";
 import { CronJob } from "cron";
 import { RevocationListItem } from "./index";
 
@@ -298,19 +298,25 @@ export default class JWTAuth<T extends RevocationListItem> {
    * to be revoked
    * @param {string} kid - id of the key to be removed
    */
-  revokeKey(kid: string): void {
+  async revokeKey(kid: string): Promise<void> {
     const keyToRemove = this.keystore.get({ kid });
     this.keystore.remove(keyToRemove);
     this.fillKeystore();
+    if (this.storage) {
+      await this.saveKeys();
+    }
   }
 
   /**
    * Revoke all keys in the keystore
    * Note: this will cause all JWTs signed to be invalid
    */
-  reset(): void {
+  async reset(): Promise<void> {
     this.keystore = new JWKS.KeyStore();
     this.fillKeystore();
+    if (this.storage) {
+      await this.saveKeys();
+    }
   }
 
   /**
@@ -407,7 +413,7 @@ export default class JWTAuth<T extends RevocationListItem> {
       }
     }
     if (revoked) {
-      throw new RevokedError();
+      throw new JWTRevoked();
     }
     this.revocationList = newRevokedList;
     return payload;

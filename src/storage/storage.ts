@@ -1,22 +1,14 @@
 import * as fs from "fs";
 import { JSONWebKeySet } from "jose";
-import { JWTAuthClientData } from ".";
+import { JWTAuthClientData } from "..";
+import { Storage } from "./interface";
 
 export interface RevocationListItem {
   jti: string;
   exp: number;
 }
 
-export abstract class Storage<T extends RevocationListItem> {
-  abstract loadKeys(): Promise<JSONWebKeySet>;
-  abstract saveKeys(keys: JSONWebKeySet): Promise<void>;
-  abstract loadClients(): Promise<JWTAuthClientData>;
-  abstract saveClients(clients: JWTAuthClientData): Promise<void>;
-  abstract loadRevocationList(): Promise<Array<T>>;
-  abstract saveRevocationList(list: Array<T>): Promise<void>;
-}
-
-interface StorageConfig {
+export interface FileStorageConfig {
   diskPath: string;
   keysFilename: string;
   clientsFilename: string;
@@ -34,7 +26,7 @@ export default class FileStorage extends Storage<RevocationListItem> {
   private clientsFilepath: string;
   private revocListFilepath: string;
 
-  constructor(config?: StorageConfig) {
+  constructor(config?: FileStorageConfig) {
     super();
     this.config = Object.assign(this.config, config || {});
     const {
@@ -57,8 +49,8 @@ export default class FileStorage extends Storage<RevocationListItem> {
    * @param {string} filepath
    * @returns {Promise<string>} data
    */
-  private async loadFromFile(filepath: string) {
-    let filehandle,
+  private async loadFromFile(filepath: string): Promise<string> | never {
+    let filehandle: fs.promises.FileHandle | undefined,
       data = "";
 
     try {
@@ -79,7 +71,7 @@ export default class FileStorage extends Storage<RevocationListItem> {
    * @param data - string to be written to a file
    * @param filepath
    */
-  async saveToFile(data: string, filepath: string): Promise<void> {
+  private async saveToFile(data: string, filepath: string): Promise<void> {
     const fd = await fs.promises.open(filepath, "w");
     await fd.write(data);
     await fd.close();
@@ -87,7 +79,7 @@ export default class FileStorage extends Storage<RevocationListItem> {
 
   async loadKeys(): Promise<JSONWebKeySet> {
     const str = await this.loadFromFile(this.keysFilepath);
-    return JSON.parse(str);
+    return str ? JSON.parse(str) : undefined;
   }
 
   async saveKeys(keys: JSONWebKeySet): Promise<void> {
@@ -96,7 +88,7 @@ export default class FileStorage extends Storage<RevocationListItem> {
 
   async loadClients(): Promise<JWTAuthClientData> {
     const str = await this.loadFromFile(this.clientsFilepath);
-    return JSON.parse(str);
+    return str ? JSON.parse(str) : undefined;
   }
 
   async saveClients(clients: JWTAuthClientData): Promise<void> {
@@ -105,7 +97,7 @@ export default class FileStorage extends Storage<RevocationListItem> {
 
   async loadRevocationList(): Promise<RevocationListItem[]> {
     const str = await this.loadFromFile(this.revocListFilepath);
-    return JSON.parse(str);
+    return str ? JSON.parse(str) : undefined;
   }
 
   async saveRevocationList(list: RevocationListItem[]): Promise<void> {

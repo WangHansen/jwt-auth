@@ -1,4 +1,4 @@
-import JWTAuth, { Options } from "../src";
+import JWTAuth, { JwtAuthOptions } from "../src";
 import FileStorage from "../src/storage";
 import { JWKS } from "jose";
 import { CronJob } from "cron";
@@ -32,7 +32,7 @@ describe("JWTAuth Tests: ", () => {
     });
 
     test("should merge options with default values", () => {
-      const opts: Options = {
+      const opts: JwtAuthOptions = {
         algorithm: "RSA",
         crvOrSize: 2048,
         amount: 4,

@@ -405,15 +405,5 @@ describe("JWTAuth Tests: ", () => {
       expect(auth.revocationList[0]).toHaveProperty("jti", "234");
       expect(() => auth.verify(jwt)).toThrow(JWTRevoked);
     });
-
-    test("token expired should not be verified", async () => {
-      const auth: any = new JWTAuth();
-      const jwt = auth.sign(
-        { username: "test" },
-        { jti: "234", expiresIn: "1s" }
-      );
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      auth.verify(jwt);
-    });
   });
 });

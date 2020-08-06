@@ -192,7 +192,8 @@ const jwt = new JWTAuth(options: JwtAuthOptions);
 - `algorithm?`: can be ['RSA' | 'EC' | 'OKP' | 'oct'], __Default__: "EC"
 - `crvOrSize?`: `<Curves | number>`: key size (in bits) or named curve ('crv') for "EC", __Default__: 2048 for RSA, 'P-256' for EC, 'Ed25519' for OKP and 256 for oct.
 - `amount?`: `<number>` number of keys kept in rotation, __Default__: 3
-- `interval?`: `<string>` cron expression for how often to generate a new key, __Default__: "* */4 * * * *": every 4 hour, generate a new token
+- `interval?`: `<string>` [cron](https://github.com/kelektiv/node-cron#cron-ranges) expression for how often to generate a new key, __Default__: "00 00 */4 * * *": every 4 hour, generate a new token
+  > Make sure the token expire time is less than the interval that a new token is generated
 - `signSkip?`: `<number>` number of keys skipped when generating a new token, __Default__: 1
   > By default, there are 3 keys stored, and by setting this to 1, every time a new token is signed, only the last 2 keys will be used since the first key will be removed after the rotation.
 - `tokenAge?`: `<string>` token expire time in zeit/ms, __Default__ '10m'

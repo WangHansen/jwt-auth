@@ -51,7 +51,7 @@ export default class JWTAuth<T extends RevocationListItem> {
     crvOrSize: "P-256",
     amount: 3,
     signSkip: 1,
-    interval: "*/4 * * * * *",
+    interval: "00 00 */4 * * *",
     tokenAge: "10m",
   };
   // eslint-disable-next-line @typescript-eslint/explicit-function-return-type

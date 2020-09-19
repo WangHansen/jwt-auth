@@ -1,8 +1,9 @@
 import FileStorage from "./storage";
 import JWTAuth from "./jwtAuth";
+import { Storage } from "./storage/interface";
 
 export * from "./jwtAuth";
-export { FileStorage };
+export { FileStorage, Storage };
 export default JWTAuth;
 
 // item save in revocation list

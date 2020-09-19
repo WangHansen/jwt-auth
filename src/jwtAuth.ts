@@ -64,8 +64,8 @@ export default class JWTAuth<T extends RevocationListItem> {
     this.fillKeystore();
     this.cronJob = new CronJob(
       interval,
-      function () {
-        this.rotate();
+      async function () {
+        await this.rotate();
       },
       null,
       true,
@@ -172,15 +172,10 @@ export default class JWTAuth<T extends RevocationListItem> {
   }
 
   private async loadKeys(): Promise<void> {
-    let JWKSet: JSONWebKeySet | undefined;
     if (!this.storage) {
       throw new Error("No persistent storage provided");
     }
-    try {
-      JWKSet = await this.storage.loadKeys();
-    } catch (error) {
-      throw new Error("storage.loadKeys function should not throw exception");
-    }
+    const JWKSet = await this.storage.loadKeys();
     if (JWKSet?.keys) {
       this.keystore = JWKS.asKeyStore(JWKSet);
     }
@@ -190,59 +185,35 @@ export default class JWTAuth<T extends RevocationListItem> {
     if (!this.storage) {
       throw new Error("No persistent storage provided");
     }
-    try {
-      this.clients = (await this.storage.loadClients()) || {};
-    } catch (error) {
-      throw new Error(
-        "storage.loadClients function should not throw exception"
-      );
-    }
+    this.clients = (await this.storage.loadClients()) || {};
   }
 
   private async loadRevocList(): Promise<void> {
     if (!this.storage) {
       throw new Error("No persistent storage provided");
     }
-    try {
-      this.revocationList = (await this.storage.loadRevocationList()) || [];
-    } catch (error) {
-      throw new Error(
-        "storage.loadRevocationList function should not throw exception"
-      );
-    }
+    this.revocationList = (await this.storage.loadRevocationList()) || [];
   }
 
   private async saveKeys(): Promise<void> {
     if (!this.storage) {
       throw new Error("No persistent storage provided");
     }
-    try {
-      await this.storage.saveKeys(this.JWKS(true));
-    } catch (error) {
-      "storage.saveKeys function should not throw exception";
-    }
+    await this.storage.saveKeys(this.JWKS(true));
   }
 
   private async saveClients(): Promise<void> {
     if (!this.storage) {
       throw new Error("No persistent storage provided");
     }
-    try {
-      await this.storage.saveClients(this.clients);
-    } catch (error) {
-      "storage.saveClients function should not throw exception";
-    }
+    await this.storage.saveClients(this.clients);
   }
 
   private async saveRevocList(): Promise<void> {
     if (!this.storage) {
       throw new Error("No persistent storage provided");
     }
-    try {
-      await this.storage.saveRevocationList(this.revocationList);
-    } catch (error) {
-      "storage.saveRevocationList function should not throw exception";
-    }
+    await this.storage.saveRevocationList(this.revocationList);
   }
 
   //-----------------------//

@@ -28,4 +28,14 @@ describe("JWTAuth FileStorage Integration Tests: ", () => {
     const keys = jwtauth.JWKS();
     expect(keys).toEqual(jwks);
   });
+
+  test("JWTAuth should save keys at rotate", async () => {
+    const storage = new FileStorage();
+    const jwtauth = new JWTAuth();
+    await jwtauth.setStorage(storage);
+    await jwtauth.rotate();
+    const jwks = jwtauth.JWKS(true);
+    const keys = await storage.loadKeys();
+    expect(keys).toEqual(jwks);
+  });
 });

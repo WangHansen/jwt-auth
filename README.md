@@ -35,6 +35,9 @@
   - [Installation](#installation)
 - [Usage](#usage)
 - [API](#api)
+- [Persistent Storage](#persistent-storage)
+  - [File Storage](#file-storage)
+  - [Write your own persistent storage](#write-your-own-persistent-storage)
 - [Contributing](#contributing)
 - [License](#license)
 - [Contact](#contact)
@@ -45,9 +48,11 @@
 
 There are a lot of authentication libraries out there that deals with JWT, probably the most popular one(the one that I used a lot in my project) is the passport-jwt library used together with passport. However, the library has the few problems:
 - Need to be used with passport.js
-> this may not be a problem to some people, but I find passport.js a little bit difficult to use since it is quite a black box model. Also, the [official example](http://www.passportjs.org/packages/passport-jwt/#configure-strategy) in documentation contains a query to db in order to authenticate the user, which I believe is against the natural of JWT (stateless).
+> This may not be a problem to some people, but I find passport.js a bit difficult to use since it's a black box model (I don't understand the magic happening behind the scene). 
+- Need to talk to DB
+> The [official example](http://www.passportjs.org/packages/passport-jwt/#configure-strategy) in documentation contains a query to db in order to authenticate the user, which I believe is against the natural, being stateless, of JWT.
 - Doesn't handle key rotation
-- Doesn't handle key revokation
+- Doesn't handle key revocation
 
 In order to address these problems, I decided to make this open source library.
 
@@ -100,16 +105,16 @@ jwt.verify(token); // this will throw JWTRevoked
 
 ### With Express
 ```javascript
+import * as express from "express";
 import JWTAuth from "@hansenw/jwt-auth";
-import { Router } from "express";
 
-const router = Router();
+const app = express();
 const jwt = new JWTAuth();
 
-router.post("/login", async (req, res, next) => {
+app.post("/login", async (req, res, next) => {
   const { username, password } = req.body;
 
-  // to verify credentials
+  // Your own logic .. to verify credentials
   const match = authenticate(username, password);
 
   if (match) {
@@ -128,7 +133,7 @@ router.post("/login", async (req, res, next) => {
 })
 
 // middleware for protecting api
-function authVerify(req, res, next) {
+function authGuard(req, res, next) {
   // getting token from header
   const header = req.headers["authorization"];
   const token = header ? header.split(" ")[1] : "";
@@ -145,15 +150,24 @@ function authVerify(req, res, next) {
   }
 }
 
-router.post("/protected", authVerify, async (req, res, next) => { 
-  res.json({ message: "jwt valid" })
+app.post("/protected", authGuard, async (req, res, next) => { 
+  // get JWT payload
+  const payload = req.payload;
+
+  // if user info is ever needed
+  const user = await db.collection("user").find({ username: payload.username });
+
+  res.json({ message: "Authorized user only" })
 })
+
+// start the express app
+app.listen(3000)
 ```
 
 ### Advanced Usage with TS
 > Customze what to store in the revocation list, be default revocation list contain items on type { jti: string, exp: number }
 
-```javascript
+```typescript
 import JWTAuth, { RevocationListItem } from "@hansenw/jwt-auth";
 
 interface RevocListItem extends RevocationListItem {
@@ -188,9 +202,9 @@ __Class: JWTAuth__
 ```javascript
 const jwt = new JWTAuth(options: JwtAuthOptions);
 ```
-`options`:
+`JwtAuthOptions`:
 - `algorithm?`: can be ['RSA' | 'EC' | 'OKP' | 'oct'], __Default__: "EC"
-- `crvOrSize?`: `<Curves | number>`: key size (in bits) or named curve ('crv') for "EC", __Default__: 2048 for RSA, 'P-256' for EC, 'Ed25519' for OKP and 256 for oct.
+- `crvOrSize?`: `<Curves | number>` key size (in bits) or named curve ('crv') for "EC", __Default__: 2048 for RSA, 'P-256' for EC, 'Ed25519' for OKP and 256 for oct.
 - `amount?`: `<number>` number of keys kept in rotation, __Default__: 3
 - `interval?`: `<string>` [cron](https://github.com/kelektiv/node-cron#cron-ranges) expression for how often to generate a new key, __Default__: "00 00 */4 * * *": every 4 hour, generate a new token
   > Make sure the token expire time is less than the interval that a new token is generated
@@ -214,7 +228,6 @@ const token = jwt.sign(payload, options?);
   - `issuer`: `<string>` JWT Issuer, "iss" claim value, if provided it will replace "iss" found in the payload
   - `jti`: `<string>` JWT ID, "jti" claim value, if provided it will replace "jti" found in the payload
   - `kid`: `<Boolean>` When true it pushes the key's "kid" to the JWT Header. **Default:** 'true' for asymmetric keys, 'false' for symmetric keys.
-  - `nonce`: `<string>` ID Token Nonce, "nonce" claim value, if provided it will replace "nonce" found in the payload. See [OpenID Connect Core 1.0][connect-core] for details.
   - `notBefore`: `<string>` JWT Not Before, "nbf" claim value, specified as string which is added to the current unix epoch timestamp e.g. `24 hours`, `20 m`, `60s`, etc., if provided it will replace Not Before found in the payload
   - `now`: `<Date>` Date object to be used instead of the current unix epoch timestamp. **Default:** 'new Date()'
   - `subject`: `<string>` JWT subject, "sub" claim value, if provided it will replace "sub" found in the payload
@@ -233,8 +246,6 @@ try {
 - `payload`: `<object>`
 - `options`: `<object>` see [jose](https://github.com/panva/jose/blob/HEAD/docs/README.md#jwtverifytoken-keyorstore-options)
   - `algorithms`: `string[]` Array of expected signing algorithms. JWT signed with an algorithm not found in this option will be rejected. **Default:** accepts all algorithms available on the passed key (or keys in the keystore)
-  - `profile`: `<string>` To validate a JWT according to a specific profile, e.g. as an ID Token. Supported values are 'id_token', 'at+JWT' (draft), and 'logout_token' (draft). **Default:** 'undefined' (generic JWT). Combine this option with the other ones like `maxAuthAge` and `nonce` or `subject` depending on the use-case. Draft profiles are updated as minor versions of the library, therefore, since they may have breaking changes use the `~` semver operator when using these and
-    pay close attention to changelog and the drafts themselves.
   - `audience`: `<string>` &vert; `string[]` Expected audience value(s). When string an exact match must be found in the payload, when array at least one must be matched.
   - `typ`: `<string>` Expected JWT "typ" Header Parameter value. An exact match must be found in the JWT header. **Default:** 'undefined' unless a `profile` with a specific value is used, in which case this option will be ignored.
   - `clockTolerance`: `<string>` Clock Tolerance for comparing timestamps, provided as timespan string e.g. `120s`, `2 minutes`, etc. **Default:** no clock tolerance
@@ -245,9 +256,7 @@ try {
   - `ignoreNbf`: `<Boolean>` When true will not be validating the "nbf" claim value to be in the past from now. **Default:** 'false'
   - `issuer`: `<string>` Expected issuer value. An exact match must be found in the payload.
   - `jti`: `<string>` Expected jti value. An exact match must be found in the payload.
-  - `maxAuthAge`: `<string>` When provided the payload is checked to have the "auth_time" claim and its value is validated, provided as timespan string e.g. `30m`, `24 hours`. See [OpenID Connect Core 1.0][connect-core] for details. Do not confuse with maxTokenAge option.
   - `maxTokenAge`: `<string>` When provided the payload is checked to have the "iat" claim and its value is validated not to be older than the provided timespan string e.g. `30m`, `24 hours`. Do not confuse with maxAuthAge option.
-  - `nonce`: `<string>` Expected nonce value. An exact match must be found in the payload. See [OpenID Connect Core 1.0][connect-core] for details.
   - `now`: `<Date>` Date object to be used instead of the current unix epoch timestamp. **Default:** 'new Date()'
   - `subject`: `<string>` Expected subject value. An exact match must be found in the payload.
 
@@ -263,8 +272,8 @@ try {
 }
 ```
 - `token`: `<string>` JWT token
-- `revocListHandler`: `<function>` a function that takes `payload` as the parameter and return a object to be saved in the revocation list. __Default__: (payload) => ({ jti: payload.jti, exp: payload.exp })
-  > the item returned must at least have two field `jti` and `exp`, JWTAuth internally use `jti` to determine if a token is revoked and use `exp` to clear the list
+- `revocListHandler`: `<function>` a function that takes `payload` as the parameter and return a object to be saved in the revocation list. __Default__: (payload) => ({ jti: payload.jti, exp: payload.exp }) 
+  > The item returned must at least have fields `jti` and `exp`, JWTAuth internally use `jti` to determine if a token is revoked and use `exp` to clear the expired token.
 
 ---
 
@@ -300,13 +309,79 @@ Remove all current keys and generate a new set, __Note__: !!this will cause all 
 await jwt.reset();
 ```
 
+## Persistent Storage
+
+It is important to save the generated keys to a persistent storage, so that application crashes and restart would not result in all authenticated users log out
+
+### File Storage
+
+By default, this library comes with one storage plugin--local file storage, this storage tries to store all the data in a folder on local disk.
+> Since the keys are very sensitive and secretive data, I don't think it is safe to send them on to the internet, thus I only provide the file storage so that it can be securely stored. If you want to store it with databases, please see [write your own persisten plugin](write-your-own-persistent-storage)
+
+```javascript
+import JwtAuth, { FileStorage } from "@hansenw/jwt-auth";
+
+const jwtAuth = new JwtAuth();
+
+const fileStore = new FileStorage();
+
+// this is async beacuse it will try to load keys from storage
+await jwtAuth.setStorage(fileStore);
+
+// after the storage is set, every time key rotation happens
+// keys will be automatically saved to file storage
+await jwtAuth.rotate();
+```
+
+#### API
+
+##### Constructor
+__Class: FileStorage__
+```javascript
+const jwt = new FileStorage(options: FileStorageConfig);
+```
+`FileStorageConfig`:
+- `diskPath?`: `<string>` path to where to store the files, __Default__: "./authcerts"
+- `keysFilename?`: `<string>` name of the file for storing all JWKs, __Default__: ".keys.json"
+- `clientsFilename?`: `<number>` name of the file for storing all clients data **[This is currently useless, will be used later on when implementing a client library that can be used]**, __Default__: ".clients.json"
+- `revocListFilename?`: `<string>` name of the file for storing all revoked JWTs, __Default__: ".revocList.json"
+
+### Write your own persistent storage
+
+Make sure you extend the Storage abstract provided by the library
+
+```typescript
+abstract class Storage<T extends RevocationListItem> {
+  abstract loadKeys(): Promise<JSONWebKeySet | undefined>;
+  abstract saveKeys(keys: JSONWebKeySet): Promise<void>;
+  abstract loadRevocationList(): Promise<Array<T> | undefined>;
+  abstract saveRevocationList(list: Array<T>): Promise<void>;
+}
+```
+
+All you need is to provide 4 methods for storing and retriving data from the persistent storage
+
+#### Methods
+
+All methods on Storage will be called automatically with the auth library so you do't need to worry about calling them
+
+Here is the list of actions that happens with auth library assuming the storage is used:
+
+Auth library method | Storage method 
+--------------------|---------------
+rotate | saveKeys
+revokeKey | saveKeys
+reset | saveKeys
+revoke | saveRevocList
+
+
 <!-- ROADMAP -->
 
 ## Roadmap
 
 - [x] implement a persistent storage
-- [ ] document persistent storage
-- [ ] implement a client library for distributed system/micro services
+- [x] document persistent storage
+- [ ] implement a client library for distributed system/microservices
 
 <!-- CONTRIBUTING -->
 

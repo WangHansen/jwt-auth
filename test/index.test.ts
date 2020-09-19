@@ -405,5 +405,23 @@ describe("JWTAuth Tests: ", () => {
       expect(auth.revocationList[0]).toHaveProperty("jti", "234");
       expect(() => auth.verify(jwt)).toThrow(JWTRevoked);
     });
+
+    test("verify function should remove old revoken token id", async () => {
+      const auth: any = new JWTAuth();
+      const expiredRevoc = {
+        jti: "111",
+        exp: new Date().getTime() / 1000 - 1,
+      };
+      const revoked = {
+        jti: "222",
+        exp: new Date().getTime() / 1000 + 10,
+      };
+      auth.revocationList.push(expiredRevoc);
+      auth.revocationList.push(revoked);
+      const jwt = auth.sign({ username: "test" }, { jti: "333" });
+      auth.verify(jwt);
+      expect(auth.revocationList).toHaveLength(1);
+      expect(auth.revocationList[0]).toStrictEqual(revoked);
+    });
   });
 });

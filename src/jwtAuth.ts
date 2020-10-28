@@ -42,6 +42,9 @@ export default class JWTAuth<T extends RevocationListItem> {
     interval: "00 00 */4 * * *",
     tokenAge: "10m",
   };
+
+  public logger = debug("jwt-auth");
+
   // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
   revokeCallback = ({ payload: { jti, exp } }): T => ({ jti, exp } as T);
 
@@ -124,7 +127,7 @@ export default class JWTAuth<T extends RevocationListItem> {
 
   private updateKeyIds(): void {
     this.keyIds = this.keystore.all().map((key) => key.kid);
-    debug("All keys in store: ", this.keyIds);
+    this.logger("All keys in store: ", this.keyIds);
   }
 
   private async loadFromStorage(): Promise<void> {
@@ -136,7 +139,7 @@ export default class JWTAuth<T extends RevocationListItem> {
     if (!this.storage) {
       throw new Error("No persistent storage provided");
     }
-    debug("loading keys from storage");
+    this.logger("loading keys from storage");
     const JWKSet = await this.storage.loadKeys();
     if (JWKSet?.keys) {
       this.keystore = JWKS.asKeyStore(JWKSet);
@@ -147,7 +150,7 @@ export default class JWTAuth<T extends RevocationListItem> {
     if (!this.storage) {
       throw new Error("No persistent storage provided");
     }
-    debug("loading revocation list from storage");
+    this.logger("loading revocation list from storage");
     this.revocationList = (await this.storage.loadRevocationList()) || [];
   }
 
@@ -155,7 +158,7 @@ export default class JWTAuth<T extends RevocationListItem> {
     if (!this.storage) {
       throw new Error("No persistent storage provided");
     }
-    debug("saving revocation list to storage");
+    this.logger("saving revocation list to storage");
     await this.storage.saveKeys(this.JWKS(true));
   }
 
@@ -163,7 +166,7 @@ export default class JWTAuth<T extends RevocationListItem> {
     if (!this.storage) {
       throw new Error("No persistent storage provided");
     }
-    debug("saving revocation list to storage");
+    this.logger("saving revocation list to storage");
     await this.storage.saveRevocationList(this.revocationList);
   }
 
@@ -194,7 +197,7 @@ export default class JWTAuth<T extends RevocationListItem> {
    * Remove the oldest key and replace it with a new key
    */
   async rotate(): Promise<void> {
-    debug("rotating keys");
+    this.logger("rotating keys");
     const { amount, algorithm, crvOrSize } = this.config;
     await this.keystore.generate(algorithm, crvOrSize, KEYGENOPT);
     this.updateKeyIds();
@@ -203,7 +206,7 @@ export default class JWTAuth<T extends RevocationListItem> {
       const keyToRemove = this.keystore.get({
         kid: this.keyIds[0],
       });
-      debug(`old key ${keyToRemove.kid} removed`);
+      this.logger(`old key ${keyToRemove.kid} removed`);
       this.keystore.remove(keyToRemove);
       this.updateKeyIds();
       amountToRemove--;
@@ -221,7 +224,7 @@ export default class JWTAuth<T extends RevocationListItem> {
    */
   async revokeKey(kid: string): Promise<void> {
     const keyToRemove = this.keystore.get({ kid });
-    debug(`key ${kid} revoked`);
+    this.logger(`key ${kid} revoked`);
     this.keystore.remove(keyToRemove);
     this.fillKeystore();
     if (this.storage) {
@@ -234,7 +237,7 @@ export default class JWTAuth<T extends RevocationListItem> {
    * Note: this will cause all JWTs signed to be invalid
    */
   async reset(): Promise<void> {
-    debug("remove all existing keys and generating new ones");
+    this.logger("remove all existing keys and generating new ones");
     this.keystore = new JWKS.KeyStore();
     this.fillKeystore();
     if (this.storage) {

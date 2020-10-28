@@ -1,4 +1,5 @@
 import * as fs from "fs";
+import debug from "debug";
 import { JSONWebKeySet } from "jose";
 import { Storage } from "./interface";
 
@@ -22,6 +23,8 @@ export default class FileStorage extends Storage<RevocationListItem> {
   private keysFilepath: string;
   private revocListFilepath: string;
 
+  private logger = debug("jwt-auth:filestore");
+
   constructor(config?: FileStorageConfig) {
     super();
     this.config = Object.assign(this.config, config || {});
@@ -40,6 +43,7 @@ export default class FileStorage extends Storage<RevocationListItem> {
    * @returns {Promise<string>} data
    */
   private async loadFromFile(filepath: string): Promise<string> | never {
+    this.logger(`loading from file ${filepath}`);
     let filehandle: fs.promises.FileHandle | undefined,
       data = "";
 
@@ -48,6 +52,7 @@ export default class FileStorage extends Storage<RevocationListItem> {
       data = await filehandle.readFile({ encoding: "utf8" });
     } catch (e) {
       // file doesn't exists
+      this.logger("file doesn't exists");
     } finally {
       if (filehandle != undefined) await filehandle.close();
     }
@@ -62,6 +67,7 @@ export default class FileStorage extends Storage<RevocationListItem> {
    * @param filepath
    */
   private async saveToFile(data: string, filepath: string): Promise<void> {
+    this.logger(`saving to file ${filepath}`);
     const fd = await fs.promises.open(filepath, "w");
     await fd.write(data);
     await fd.close();

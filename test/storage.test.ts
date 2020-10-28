@@ -4,7 +4,6 @@ import FileStorage from "../src/storage";
 describe("FileStorage Tests: ", () => {
   const defaultDiskPath = "./authcerts",
     keysFilename = ".keys.json",
-    clientsFilename = ".clients.json",
     revocListFilename = ".revocList.json";
 
   beforeAll(() => {
@@ -25,9 +24,6 @@ describe("FileStorage Tests: ", () => {
       const storage = new FileStorage() as any;
       expect(fs.existsSync(defaultDiskPath)).toBe(true);
       expect(storage.keysFilepath).toBe(`${defaultDiskPath}/${keysFilename}`);
-      expect(storage.clientsFilepath).toBe(
-        `${defaultDiskPath}/${clientsFilename}`
-      );
       expect(storage.revocListFilepath).toBe(
         `${defaultDiskPath}/${revocListFilename}`
       );
@@ -37,7 +33,6 @@ describe("FileStorage Tests: ", () => {
       const customConfig = {
         diskPath: "./authtest",
         keysFilename: "keys.txt",
-        clientsFilename: "clients.txt",
         revocListFilename: "revocs.txt",
       };
       expect(fs.existsSync(customConfig.diskPath)).toBe(false);
@@ -45,9 +40,6 @@ describe("FileStorage Tests: ", () => {
       expect(fs.existsSync(customConfig.diskPath)).toBe(true);
       expect(storage.keysFilepath).toBe(
         `${customConfig.diskPath}/${customConfig.keysFilename}`
-      );
-      expect(storage.clientsFilepath).toBe(
-        `${customConfig.diskPath}/${customConfig.clientsFilename}`
       );
       expect(storage.revocListFilepath).toBe(
         `${customConfig.diskPath}/${customConfig.revocListFilename}`
@@ -89,7 +81,7 @@ describe("FileStorage Tests: ", () => {
   });
 
   describe("public methods tests: ", () => {
-    const loadTestCases = ["loadKeys", "loadClients", "loadRevocationList"];
+    const loadTestCases = ["loadKeys", "loadRevocationList"];
     for (const funcName of loadTestCases) {
       test(`${funcName} should call loadFromFile internally and parse to json`, async () => {
         const storage = new FileStorage() as any;
@@ -108,7 +100,6 @@ describe("FileStorage Tests: ", () => {
         func: "saveKeys",
         data: { keys: [{ e: "e", d: "d" }] },
       },
-      { func: "saveClients", data: { service: "url" } },
       {
         func: "saveRevocationList",
         data: [{ jti: "somejti", exp: new Date() }],

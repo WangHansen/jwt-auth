@@ -117,15 +117,11 @@ describe("JWTAuth Tests: ", () => {
       const spyk = jest
         .spyOn(auth, "loadKeys")
         .mockImplementationOnce(() => Promise.resolve());
-      const spyc = jest
-        .spyOn(auth, "loadClients")
-        .mockImplementationOnce(() => Promise.resolve());
       const spyl = jest
         .spyOn(auth, "loadRevocList")
         .mockImplementationOnce(() => Promise.resolve());
       await auth.loadFromStorage();
       expect(spyk).toBeCalled();
-      expect(spyc).toBeCalled();
       expect(spyl).toBeCalled();
     });
 
@@ -134,15 +130,11 @@ describe("JWTAuth Tests: ", () => {
       const spyk = jest
         .spyOn(auth, "loadKeys")
         .mockImplementationOnce(() => Promise.resolve());
-      const spyc = jest
-        .spyOn(auth, "loadClients")
-        .mockImplementationOnce(() => Promise.resolve());
       const spyl = jest
         .spyOn(auth, "loadRevocList")
         .mockImplementationOnce(() => Promise.resolve());
       await auth.loadFromStorage();
       expect(spyk).not.toBeCalled();
-      expect(spyc).not.toBeCalled();
       expect(spyl).not.toBeCalled();
     });
 
@@ -162,24 +154,6 @@ describe("JWTAuth Tests: ", () => {
         expect(error.message).toBe("No persistent storage provided");
       }
       expect(storageMock.loadKeys).not.toBeCalled();
-    });
-
-    test("loadClients should call loadClients on storage", async () => {
-      const auth = new JWTAuth() as any;
-      await auth.setStorage(storageMock);
-      await auth.loadClients();
-      expect(storageMock.loadClients).toBeCalled();
-    });
-
-    test("loadClients should throw if no storage is set", async () => {
-      const auth = new JWTAuth() as any;
-      try {
-        await auth.loadClients();
-      } catch (error) {
-        expect(error).toBeDefined();
-        expect(error.message).toBe("No persistent storage provided");
-      }
-      expect(storageMock.loadClients).not.toBeCalled();
     });
 
     test("loadRevocList should call loadRevocList on storage", async () => {
@@ -216,24 +190,6 @@ describe("JWTAuth Tests: ", () => {
         expect(error.message).toBe("No persistent storage provided");
       }
       expect(storageMock.saveKeys).not.toBeCalled();
-    });
-
-    test("saveClients should call storage save with clients object", async () => {
-      const auth = new JWTAuth() as any;
-      await auth.setStorage(storageMock);
-      await auth.saveClients();
-      expect(storageMock.saveClients).toBeCalledWith(auth.clients);
-    });
-
-    test("saveClients should throw if no storage is set", async () => {
-      const auth = new JWTAuth() as any;
-      try {
-        await auth.saveClients();
-      } catch (error) {
-        expect(error).toBeDefined();
-        expect(error.message).toBe("No persistent storage provided");
-      }
-      expect(storageMock.saveClients).not.toBeCalled();
     });
 
     test("saveRevocList should call storage save with revocationList", async () => {
@@ -280,9 +236,6 @@ describe("JWTAuth Tests: ", () => {
   describe("public methods tests: ", () => {
     test("rotate should remove the oldest key and generate a new key and sync", async () => {
       const auth: any = new JWTAuth();
-      const spySync = jest
-        .spyOn(auth, "sync")
-        .mockImplementation(() => Promise.resolve());
       jest.spyOn(auth, "saveKeys").mockImplementation(() => Promise.resolve());
       const keyids = auth.keyids;
       const jwks = auth.JWKS();
@@ -293,7 +246,6 @@ describe("JWTAuth Tests: ", () => {
       expect(jwks.keys).toHaveLength(3);
       expect(newKeyids).toHaveLength(3);
       expect(newJwks.keys).toHaveLength(3);
-      expect(spySync).toBeCalled();
       for (let i = 1; i < 3; i++) {
         expect(keyids[i]).toBe(newKeyids[i - 1]);
         expect(jwks.keys[i]).toStrictEqual(newJwks.keys[i - 1]);
@@ -342,35 +294,6 @@ describe("JWTAuth Tests: ", () => {
         expect(newKeyids).not.toContain(id);
       }
       expect(spy).toBeCalled();
-    });
-
-    test("registerClient should return data", async () => {
-      const auth: any = new JWTAuth();
-      const clientdata = {
-        name: "test-svc",
-        url: "https://localhost/api",
-      };
-      const spy = jest
-        .spyOn(auth, "saveClients")
-        .mockImplementation(() => Promise.resolve());
-      const res = await auth.registerClient(clientdata);
-      expect(spy).not.toBeCalled();
-      expect(res).toStrictEqual(auth.data);
-    });
-
-    test("registerClient should save data if storage is set", async () => {
-      const auth: any = new JWTAuth();
-      await auth.setStorage(storageMock);
-      const clientdata = {
-        name: "test-svc",
-        url: "https://localhost/api",
-      };
-      const spy = jest
-        .spyOn(auth, "saveClients")
-        .mockImplementation(() => Promise.resolve());
-      const res = await auth.registerClient(clientdata);
-      expect(spy).toBeCalled();
-      expect(res).toStrictEqual(auth.data);
     });
   });
 

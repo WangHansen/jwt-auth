@@ -1,6 +1,5 @@
 import * as fs from "fs";
 import { JSONWebKeySet } from "jose";
-import { JWTAuthClientData } from "..";
 import { Storage } from "./interface";
 
 export interface RevocationListItem {
@@ -11,7 +10,6 @@ export interface RevocationListItem {
 export interface FileStorageConfig {
   diskPath: string;
   keysFilename: string;
-  clientsFilename: string;
   revocListFilename: string;
 }
 
@@ -19,27 +17,19 @@ export default class FileStorage extends Storage<RevocationListItem> {
   private config = {
     diskPath: "./authcerts",
     keysFilename: ".keys.json",
-    clientsFilename: ".clients.json",
     revocListFilename: ".revocList.json",
   };
   private keysFilepath: string;
-  private clientsFilepath: string;
   private revocListFilepath: string;
 
   constructor(config?: FileStorageConfig) {
     super();
     this.config = Object.assign(this.config, config || {});
-    const {
-      diskPath,
-      keysFilename,
-      clientsFilename,
-      revocListFilename,
-    } = this.config;
+    const { diskPath, keysFilename, revocListFilename } = this.config;
     if (!fs.existsSync(diskPath)) {
       fs.mkdirSync(diskPath);
     }
     this.keysFilepath = `${diskPath}/${keysFilename}`;
-    this.clientsFilepath = `${diskPath}/${clientsFilename}`;
     this.revocListFilepath = `${diskPath}/${revocListFilename}`;
   }
 
@@ -84,15 +74,6 @@ export default class FileStorage extends Storage<RevocationListItem> {
 
   async saveKeys(keys: JSONWebKeySet): Promise<void> {
     await this.saveToFile(JSON.stringify(keys), this.keysFilepath);
-  }
-
-  async loadClients(): Promise<JWTAuthClientData> {
-    const str = await this.loadFromFile(this.clientsFilepath);
-    return str ? JSON.parse(str) : undefined;
-  }
-
-  async saveClients(clients: JWTAuthClientData): Promise<void> {
-    await this.saveToFile(JSON.stringify(clients), this.clientsFilepath);
   }
 
   async loadRevocationList(): Promise<RevocationListItem[]> {

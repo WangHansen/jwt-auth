@@ -6,11 +6,9 @@ import {
   keyType,
   BasicParameters,
 } from "jose";
-import got from "got";
-import { Request, Response, NextFunction } from "express";
 import * as crypto from "crypto";
 import { Storage } from "./storage/interface";
-import { JWTRevoked, SyncError } from "./error";
+import { JWTRevoked } from "./error";
 import { CronJob } from "cron";
 import { RevocationListItem } from "./index";
 
@@ -23,18 +21,8 @@ export interface JwtAuthOptions {
   tokenAge?: string; // token expire time in zeit/ms, default '10m' for access token
 }
 
-interface ClientData {
-  name: string;
-  url: string;
-}
-
 interface JWTAuthData<T> extends JSONWebKeySet {
   revocList: T[];
-}
-
-// format is serviceName: url
-export interface JWTAuthClientData {
-  [name: string]: string;
 }
 
 const KEYGENOPT: BasicParameters = { use: "sig" };
@@ -43,7 +31,6 @@ export default class JWTAuth<T extends RevocationListItem> {
   private storage: Storage<T> | null = null;
   private keystore: JWKS.KeyStore;
   private keyids: string[] = [];
-  private clients: JWTAuthClientData = {};
   private revocationList: T[] = [];
   private cronJob: CronJob | null;
   private config: Required<JwtAuthOptions> = {
@@ -127,30 +114,6 @@ export default class JWTAuth<T extends RevocationListItem> {
     this.updateKeyids();
   }
 
-  /**
-   * Callback is invoked when sync with a client errors
-   * @callback syncFailedCallback
-   * @param {string} name - name of the client
-   * @param {string} error - error rejected
-   */
-  /**
-   * Sync the keys with all clients
-   * @param {object} data - the data to be synced
-   * @param {syncFailedCallback} cb - called when sync failed with a client
-   */
-  private async syncWithClients(
-    data: JWTAuthData<T>,
-    cb: (name: string, err: Error) => void
-  ): Promise<void> {
-    const allPromise: Promise<unknown>[] = [];
-    Object.entries(this.clients).forEach(([name, url]) => {
-      allPromise.push(
-        got.post(url, { json: data }).catch((err) => cb(name, err))
-      );
-    });
-    await Promise.all(allPromise);
-  }
-
   private generateJTI(): string {
     const hash = crypto.createHash("sha256");
     const rand =
@@ -164,11 +127,7 @@ export default class JWTAuth<T extends RevocationListItem> {
 
   private async loadFromStorage(): Promise<void> {
     if (!this.storage) return;
-    await Promise.all([
-      this.loadKeys(),
-      this.loadClients(),
-      this.loadRevocList(),
-    ]);
+    await Promise.all([this.loadKeys(), this.loadRevocList()]);
   }
 
   private async loadKeys(): Promise<void> {
@@ -179,13 +138,6 @@ export default class JWTAuth<T extends RevocationListItem> {
     if (JWKSet?.keys) {
       this.keystore = JWKS.asKeyStore(JWKSet);
     }
-  }
-
-  private async loadClients(): Promise<void> {
-    if (!this.storage) {
-      throw new Error("No persistent storage provided");
-    }
-    this.clients = (await this.storage.loadClients()) || {};
   }
 
   private async loadRevocList(): Promise<void> {
@@ -200,13 +152,6 @@ export default class JWTAuth<T extends RevocationListItem> {
       throw new Error("No persistent storage provided");
     }
     await this.storage.saveKeys(this.JWKS(true));
-  }
-
-  private async saveClients(): Promise<void> {
-    if (!this.storage) {
-      throw new Error("No persistent storage provided");
-    }
-    await this.storage.saveClients(this.clients);
   }
 
   private async saveRevocList(): Promise<void> {
@@ -258,9 +203,6 @@ export default class JWTAuth<T extends RevocationListItem> {
     if (this.storage) {
       await this.saveKeys();
     }
-    await this.sync((name: string, err: Error) => {
-      throw new SyncError(`Failed to sync with ${name}, ${err.message}`);
-    });
   }
 
   /**
@@ -288,49 +230,6 @@ export default class JWTAuth<T extends RevocationListItem> {
     if (this.storage) {
       await this.saveKeys();
     }
-  }
-
-  /**
-   * Register a client
-   * @param {ClientData} data - data passed from client
-   * @throws throws an error if one of name, url and path is missing
-   */
-  async registerClient(data: ClientData): Promise<JWTAuthData<T>> {
-    const { name, url } = data;
-    if (!name || !url) {
-      throw new Error("Client data not complete, missing name or url or path");
-    }
-    this.clients[name] = url;
-    if (this.storage) {
-      await this.saveClients();
-    }
-    return this.data;
-  }
-
-  /**
-   * Function used for connect like server such as express
-   * @example
-   * app.post('/client/register', server.register)
-   */
-  register = async (
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> => {
-    try {
-      const data = await this.registerClient(req.body);
-      res.json({ message: "Registeration success", data });
-    } catch (error) {
-      next(error);
-    }
-  };
-
-  /**
-   * Sync data with all the registered clients
-   * @param {Function} cb - callback to handle error
-   */
-  async sync(cb: (name: string, err: Error) => void): Promise<void> {
-    await this.syncWithClients(this.data, cb);
   }
 
   /**

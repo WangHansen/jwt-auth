@@ -85,7 +85,7 @@ describe("JWTAuth Tests: ", () => {
   describe("private methods tests: ", () => {
     test("fillKeystore should fill the keystore with keys", async () => {
       const auth = new JWTAuth() as any;
-      const spy = jest.spyOn(auth, "updateKeyids");
+      const spy = jest.spyOn(auth, "updateKeyIds");
       auth.fillKeystore();
       expect(auth.keystore.size).toBe(3);
       expect(spy).toBeCalled();
@@ -93,7 +93,7 @@ describe("JWTAuth Tests: ", () => {
     test("fillKeystore should fill the keystore with keys", async () => {
       const auth = new JWTAuth() as any;
       await auth.setStorage(storageMock);
-      const spy = jest.spyOn(auth, "updateKeyids");
+      const spy = jest.spyOn(auth, "updateKeyIds");
       auth.fillKeystore();
       expect(auth.keystore.size).toBe(3);
       expect(spy).toBeCalled();
@@ -237,48 +237,48 @@ describe("JWTAuth Tests: ", () => {
     test("rotate should remove the oldest key and generate a new key and sync", async () => {
       const auth: any = new JWTAuth();
       jest.spyOn(auth, "saveKeys").mockImplementation(() => Promise.resolve());
-      const keyids = auth.keyids;
+      const keyIds = auth.keyIds;
       const jwks = auth.JWKS();
       await auth.rotate();
-      const newKeyids = auth.keyids;
+      const newKeyids = auth.keyIds;
       const newJwks = auth.JWKS();
-      expect(keyids).toHaveLength(3);
+      expect(keyIds).toHaveLength(3);
       expect(jwks.keys).toHaveLength(3);
       expect(newKeyids).toHaveLength(3);
       expect(newJwks.keys).toHaveLength(3);
       for (let i = 1; i < 3; i++) {
-        expect(keyids[i]).toBe(newKeyids[i - 1]);
+        expect(keyIds[i]).toBe(newKeyids[i - 1]);
         expect(jwks.keys[i]).toStrictEqual(newJwks.keys[i - 1]);
       }
     });
 
     test("revokeKey should remove the key based on id", async () => {
       const auth: any = new JWTAuth();
-      const keyids = auth.keyids;
-      const keyid = keyids[0];
+      const keyIds = auth.keyIds;
+      const keyid = keyIds[0];
       await auth.revokeKey(keyid);
-      const newKeyids = auth.keyids;
-      expect(newKeyids).not.toContain(keyids);
+      const newKeyids = auth.keyIds;
+      expect(newKeyids).not.toContain(keyIds);
     });
 
     test("revokeKey should call saveKeys if storage is present", async () => {
       const auth: any = new JWTAuth();
       await auth.setStorage(storageMock);
       const spy = jest.spyOn(auth, "saveKeys").mockResolvedValueOnce({});
-      const keyids = auth.keyids;
-      const keyid = keyids[0];
+      const keyIds = auth.keyIds;
+      const keyid = keyIds[0];
       await auth.revokeKey(keyid);
-      const newKeyids = auth.keyids;
-      expect(newKeyids).not.toContain(keyids);
+      const newKeyids = auth.keyIds;
+      expect(newKeyids).not.toContain(keyIds);
       expect(spy).toBeCalled();
     });
 
     test("reset should remove all old key and generate a new set", async () => {
       const auth: any = new JWTAuth();
-      const keyids = auth.keyids;
+      const keyIds = auth.keyIds;
       await auth.reset();
-      const newKeyids = auth.keyids;
-      for (const id of keyids) {
+      const newKeyids = auth.keyIds;
+      for (const id of keyIds) {
         expect(newKeyids).not.toContain(id);
       }
     });
@@ -287,10 +287,10 @@ describe("JWTAuth Tests: ", () => {
       const auth: any = new JWTAuth();
       await auth.setStorage(storageMock);
       const spy = jest.spyOn(auth, "saveKeys").mockResolvedValueOnce({});
-      const keyids = auth.keyids;
+      const keyIds = auth.keyIds;
       await auth.reset();
-      const newKeyids = auth.keyids;
-      for (const id of keyids) {
+      const newKeyids = auth.keyIds;
+      for (const id of keyIds) {
         expect(newKeyids).not.toContain(id);
       }
       expect(spy).toBeCalled();

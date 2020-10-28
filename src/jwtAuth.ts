@@ -6,6 +6,7 @@ import {
   keyType,
   BasicParameters,
 } from "jose";
+import debug from "debug";
 import * as crypto from "crypto";
 import { Storage } from "./storage/interface";
 import { JWTRevoked } from "./error";
@@ -30,7 +31,7 @@ const KEYGENOPT: BasicParameters = { use: "sig" };
 export default class JWTAuth<T extends RevocationListItem> {
   private storage: Storage<T> | null = null;
   private keystore: JWKS.KeyStore;
-  private keyids: string[] = [];
+  private keyIds: string[] = [];
   private revocationList: T[] = [];
   private cronJob: CronJob | null;
   private config: Required<JwtAuthOptions> = {
@@ -111,7 +112,7 @@ export default class JWTAuth<T extends RevocationListItem> {
     while (this.keystore.size < amount) {
       this.keystore.generateSync(algorithm, crvOrSize, KEYGENOPT);
     }
-    this.updateKeyids();
+    this.updateKeyIds();
   }
 
   private generateJTI(): string {
@@ -121,8 +122,9 @@ export default class JWTAuth<T extends RevocationListItem> {
     return hash.update(rand).digest("base64");
   }
 
-  private updateKeyids(): void {
-    this.keyids = this.keystore.all().map((key) => key.kid);
+  private updateKeyIds(): void {
+    this.keyIds = this.keystore.all().map((key) => key.kid);
+    debug("All keys in store: ", this.keyIds);
   }
 
   private async loadFromStorage(): Promise<void> {
@@ -134,6 +136,7 @@ export default class JWTAuth<T extends RevocationListItem> {
     if (!this.storage) {
       throw new Error("No persistent storage provided");
     }
+    debug("loading keys from storage");
     const JWKSet = await this.storage.loadKeys();
     if (JWKSet?.keys) {
       this.keystore = JWKS.asKeyStore(JWKSet);
@@ -144,6 +147,7 @@ export default class JWTAuth<T extends RevocationListItem> {
     if (!this.storage) {
       throw new Error("No persistent storage provided");
     }
+    debug("loading revocation list from storage");
     this.revocationList = (await this.storage.loadRevocationList()) || [];
   }
 
@@ -151,6 +155,7 @@ export default class JWTAuth<T extends RevocationListItem> {
     if (!this.storage) {
       throw new Error("No persistent storage provided");
     }
+    debug("saving revocation list to storage");
     await this.storage.saveKeys(this.JWKS(true));
   }
 
@@ -158,6 +163,7 @@ export default class JWTAuth<T extends RevocationListItem> {
     if (!this.storage) {
       throw new Error("No persistent storage provided");
     }
+    debug("saving revocation list to storage");
     await this.storage.saveRevocationList(this.revocationList);
   }
 
@@ -188,16 +194,18 @@ export default class JWTAuth<T extends RevocationListItem> {
    * Remove the oldest key and replace it with a new key
    */
   async rotate(): Promise<void> {
+    debug("rotating keys");
     const { amount, algorithm, crvOrSize } = this.config;
     await this.keystore.generate(algorithm, crvOrSize, KEYGENOPT);
-    this.updateKeyids();
+    this.updateKeyIds();
     let amountToRemove = this.keystore.size - amount;
     while (amountToRemove > 0) {
       const keyToRemove = this.keystore.get({
-        kid: this.keyids[0],
+        kid: this.keyIds[0],
       });
+      debug(`old key ${keyToRemove.kid} removed`);
       this.keystore.remove(keyToRemove);
-      this.updateKeyids();
+      this.updateKeyIds();
       amountToRemove--;
     }
     if (this.storage) {
@@ -213,6 +221,7 @@ export default class JWTAuth<T extends RevocationListItem> {
    */
   async revokeKey(kid: string): Promise<void> {
     const keyToRemove = this.keystore.get({ kid });
+    debug(`key ${kid} revoked`);
     this.keystore.remove(keyToRemove);
     this.fillKeystore();
     if (this.storage) {
@@ -225,6 +234,7 @@ export default class JWTAuth<T extends RevocationListItem> {
    * Note: this will cause all JWTs signed to be invalid
    */
   async reset(): Promise<void> {
+    debug("remove all existing keys and generating new ones");
     this.keystore = new JWKS.KeyStore();
     this.fillKeystore();
     if (this.storage) {
@@ -245,7 +255,7 @@ export default class JWTAuth<T extends RevocationListItem> {
         this.config.signSkip
     );
     const key = this.keystore.get({
-      kid: this.keyids[keyIndex],
+      kid: this.keyIds[keyIndex],
     });
     if (!options.expiresIn) {
       options.expiresIn = this.config.tokenAge;

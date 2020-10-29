@@ -9,7 +9,7 @@
     "strict": true,
     "sourceMap": true,
     "moduleResolution": "node",
-    "types": ["node", "jest", "got", "jose", "cron", "express"],
+    "types": ["node", "jest", "jose", "cron", "express"],
   },
   "include": ["src"],
   "exclude": ["node_modules", "lib", "tests"]

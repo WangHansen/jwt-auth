@@ -7,7 +7,7 @@
   "scripts": {
     "build": "tsc",
     "test": "jest",
-    "prepare": "npm run build",
+    "prepare": "rm -rf lib/ && npm run build",
     "prepublishOnly": "npm test",
     "postversion": "git push && git push --tags"
   },

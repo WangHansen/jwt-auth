@@ -1,6 +1,7 @@
 [![Build Status](https://travis-ci.org/WangHansen/jwt-auth.svg?branch=master)](https://travis-ci.org/WangHansen/jwt-auth)
 [![codecov](https://codecov.io/gh/WangHansen/jwt-auth/branch/master/graph/badge.svg)](https://codecov.io/gh/WangHansen/jwt-auth)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FWangHansen%2Fjwt-auth.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2FWangHansen%2Fjwt-auth?ref=badge_shield)
 
 <!-- PROJECT LOGO -->
 <br />
@@ -400,3 +401,6 @@ Contributions are what make the open source community such an amazing place to b
 ## License
 
 Distributed under the MIT License. See `LICENSE` for more information.
+
+
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FWangHansen%2Fjwt-auth.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2FWangHansen%2Fjwt-auth?ref=badge_large)

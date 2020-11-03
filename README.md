@@ -14,15 +14,6 @@
 
   <p align="center">
     A light weight authentication library that supports key rotation and revokation list.
-    <br />
-    <!-- <a href="https://github.com/WangHansen/jwt-auth"><strong>Explore the docs »</strong></a>
-    <br />
-    <br />
-    <a href="https://github.com/WangHansen/jwt-auth">View Demo</a>
-    ·
-    <a href="https://github.com/WangHansen/jwt-auth/issues">Report Bug</a>
-    ·
-    <a href="https://github.com/WangHansen/jwt-auth/issues">Request Feature</a> -->
   </p>
 </p>
 
@@ -30,7 +21,7 @@
 
 ## Table of Contents
 
-- [About the Project](#about-the-project)
+- [Another auth library?](#about-the-project)
 - [Getting Started](#getting-started)
   - [Prerequisites](#prerequisites)
   - [Installation](#installation)
@@ -45,15 +36,15 @@
 
 <!-- ABOUT THE PROJECT -->
 
-## About The Project
+## Another auth library?
 
 There are a lot of authentication libraries out there that deals with JWT, probably the most popular one(the one that I used a lot in my project) is the passport-jwt library used together with passport. However, the library has the few problems:
 - Need to be used with passport.js
 > This may not be a problem to some people, but I find passport.js a bit difficult to use since it's a black box model (I don't understand the magic happening behind the scene). 
 - Need to talk to DB
 > The [official example](http://www.passportjs.org/packages/passport-jwt/#configure-strategy) in documentation contains a query to db in order to authenticate the user, which I believe is against the natural, being stateless, of JWT.
-- Doesn't handle key rotation
-- Doesn't handle key revocation
+- Doesn't handle <b>key rotation</b>
+- Doesn't handle <b>key revocation</b>
 
 In order to address these problems, I decided to make this open source library.
 
@@ -195,6 +186,59 @@ await jwt.revoke(token, (payload) => ({
 }));
 jwt.verify(token); // this will throw JWTRevoked
 ```
+
+### Microservice
+
+If you want to build your own auth server or auth service within the microservices, check out this [jwt-jwks-client](https://github.com/WangHansen/jwt-jwks-client) library I made that can be used together with this one.
+
+#### server.ts
+```typescript
+import * as express from "express";
+import JWTAuth from "@hansenw/jwt-auth";
+
+const app = express()
+const authService = new JwtAuth();
+
+app.post("/login", (req: Request, res: Response) => {
+  // Replace with your own matching logic
+  if (req.body.username === "admin" && req.body.password === "password") {
+    const token = authService.sign({ userId: "admin" });
+    return (
+      res
+        .set("authorization", token)
+        .send("Authorized")
+    );
+  }
+  res.status(401).send("Not authorized");
+});
+
+// Expose jwks through an API
+app.get("/jwks", (req: Request, res: Response) => {
+  res.json(authService.JWKS(true));
+});
+```
+
+#### Client
+```ts
+import * as express from "express";
+import JwksClient from "jwt-jwks-client";
+
+const authClient = new JwksClient({
+  jwksUri: "http://localhost:3000/jwks",
+  secure: false,
+});
+
+app.get("/secret", async (req: Request, res: Response) => {
+  const token = req.headers.authorization;
+  if (token) {
+    // Verify the token here
+    await authClient.verify(token);
+    return res.send("This is a secret page");
+  }
+  return res.send(`You are not authorized to see the secret page`);
+});
+```
+See complete example [here](https://github.com/WangHansen/jwt-jwks-client/tree/master/example)
 
 ## API
 
@@ -382,7 +426,7 @@ revoke | saveRevocList
 
 - [x] implement a persistent storage
 - [x] document persistent storage
-- [ ] implement a client library for distributed system/microservices
+- [x] implement a client library for distributed system/microservices
 
 <!-- CONTRIBUTING -->
 

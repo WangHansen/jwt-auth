@@ -151,7 +151,7 @@ describe("JWTAuth Tests: ", () => {
         await auth.loadKeys();
       } catch (error) {
         expect(error).toBeDefined();
-        expect(error.message).toBe("No persistent storage provided");
+        expect((error as any).message).toBe("No persistent storage provided");
       }
       expect(storageMock.loadKeys).not.toBeCalled();
     });
@@ -169,7 +169,7 @@ describe("JWTAuth Tests: ", () => {
         await auth.loadRevocList();
       } catch (error) {
         expect(error).toBeDefined();
-        expect(error.message).toBe("No persistent storage provided");
+        expect((error as any).message).toBe("No persistent storage provided");
       }
       expect(storageMock.loadRevocationList).not.toBeCalled();
     });
@@ -187,7 +187,7 @@ describe("JWTAuth Tests: ", () => {
         await auth.saveKeys();
       } catch (error) {
         expect(error).toBeDefined();
-        expect(error.message).toBe("No persistent storage provided");
+        expect((error as any).message).toBe("No persistent storage provided");
       }
       expect(storageMock.saveKeys).not.toBeCalled();
     });
@@ -207,7 +207,7 @@ describe("JWTAuth Tests: ", () => {
         await auth.saveRevocList();
       } catch (error) {
         expect(error).toBeDefined();
-        expect(error.message).toBe("No persistent storage provided");
+        expect((error as any).message).toBe("No persistent storage provided");
       }
       expect(storageMock.saveRevocationList).not.toBeCalled();
     });

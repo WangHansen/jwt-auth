@@ -40,7 +40,7 @@ export default class JWTAuth<T extends RevocationListItem> {
     amount: 3,
     signSkip: 1,
     interval: "00 00 */4 * * *",
-    tokenAge: "10m",
+    tokenAge: "30m",
   };
 
   public logger = debug("jwt-auth");

@@ -1,6 +1,6 @@
 {
   "name": "@hansenw/jwt-auth",
-  "version": "0.11.0",
+  "version": "0.11.1",
   "description": "A complete JWT auth library that provides key rotation, token revocation and persistent key storage",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
